@@ -143,7 +143,7 @@ INVENTORY_RULES = {
 }
 
 EXPENSE_TYPES = ["Staff Salary", "Diesel", "Maintenance", "Shop Rent", "Other"]
-DASHBOARD_PASSWORD = st.secrets["general"]["dashboard_password"]
+DASHBOARD_PASSWORD = 'sunny123'
 
 # --- APP CONFIG & PRINT CSS ---
 st.set_page_config(page_title="Inventory Pro", layout="wide")
@@ -583,4 +583,5 @@ elif page == "Bill Generator":
                 total_val = display_bill['amount'].sum()
                 st.markdown(f"## Total Bill Amount: ₹{total_val:,.2f}")
             st.markdown('</div>', unsafe_allow_html=True)
+
             st.info("💡 Press **Ctrl + P** to print.")
