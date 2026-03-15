@@ -496,7 +496,10 @@ elif page == "New Transaction":
             sel_site = st.selectbox("Site Location", ["-- New Site --"] + existing_sites)
             site_name = st.text_input("Enter New Site") if sel_site == "-- New Site --" else sel_site
         with h_col3:
-            vehicle = st.text_input("Vehicle Number", placeholder="e.g. GJ-01-XX-0000")
+            VEHICLES = ["MH12DT4738", "MH12LT9760", "MH12ET7413", "MH12MV4032"]
+            vehicle = st.selectbox("Vehicle Number", ["-- No Vehicle --"] + VEHICLES)
+            if vehicle == "-- No Vehicle --":
+                vehicle = ""
 
     st.subheader("🛒 Add Items")
     with st.container(border=True):
