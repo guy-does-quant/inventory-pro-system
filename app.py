@@ -18,19 +18,26 @@ def init_db():
 
 # --- DB HELPERS ---
 def update_stock(category, item_type, unit, qty_change):
-    # Match the specific item
+    # Convert qty to base unit (pati) if it's a stone/crusher item
+    if unit in UNIT_CONVERSIONS:
+        qty_in_pati = convert_to_base_unit(qty_change, unit)
+        store_unit = "pati"
+    else:
+        qty_in_pati = qty_change
+        store_unit = unit
+
     res = supabase.table("stock_summary").select("current_stock")\
-        .match({"category": category, "item_type": item_type, "unit": unit})\
+        .match({"category": category, "item_type": item_type, "unit": store_unit})\
         .execute()
     
     if res.data:
-        new_total = res.data[0]['current_stock'] + qty_change
+        new_total = res.data[0]['current_stock'] + qty_in_pati
         supabase.table("stock_summary").update({"current_stock": new_total})\
-            .match({"category": category, "item_type": item_type, "unit": unit}).execute()
+            .match({"category": category, "item_type": item_type, "unit": store_unit}).execute()
     else:
         supabase.table("stock_summary").insert({
-            "category": category, "item_type": item_type, 
-            "unit": unit, "current_stock": qty_change
+            "category": category, "item_type": item_type,
+            "unit": store_unit, "current_stock": qty_in_pati
         }).execute()
 
 def insert_transaction(data):
@@ -197,12 +204,87 @@ def generate_bill_pdf(bill_data, party_name, total_val):
 
 # --- CONFIGURATION ---
 INVENTORY_RULES = {
-    "Cement": {"JK Strong": {"bag"}, "JK Super": {"bag"}, "Birla Super": {"bag"}, "UltraTech": {"bag"}, "Shree 43": {"bag"}, "Shree 53": {"bag"}},
-    "Stone/Crusher": {"Khadi": {"pati", "brass"}, "Crush Sand": {"pati", "brass"}, "Plaster Sand": {"pati", "brass"}},
-    "Bricks": {"Cement 4\"": {"pcs"}, "Cement 6\"": {"pcs"}, "Red Brick": {"pcs"}},
-    "AAC Block": {"AAC 4\"": {"pcs", "cbm"},"AAC 5\"": {"pcs", "cbm"}, "AAC 6\"": {"pcs", "cbm"}},
-    "Chemicals": {"Tile Chemical": {"bag"}, "Waterproofing": {"litre", "kg"}}
+    "Cement": {
+        "JK Strong": {"bag"}, 
+        "JK Super": {"bag"}, 
+        "Birla Super": {"bag"}, 
+        "UltraTech": {"bag"}, 
+        "Shree 43": {"bag"}, 
+        "Shree 53": {"bag"}
+    },
+    "Stone/Crusher": {
+        "Khadi": {"pati", "brass","piaggo"},
+        "Crush Sand": {"pati", "brass","piaggo"},
+        "Plaster Sand": {"pati", "brass","piaggo"},
+        "M Sand": {"pati", "brass","piaggo"},
+        "Grit": {"pati", "brass","piaggo"},
+        "JSB": {"pati", "brass","piaggo"}
+    },
+    "Bricks": {
+        "Cement 4\"": {"pcs"},
+        "Cement 6\"": {"pcs"}, 
+        "Red Brick": {"pcs"}
+    },
+    "AAC Block": {
+        "AAC 4\"": {"pcs", "cbm"},
+        "AAC 5\"": {"pcs", "cbm"}, 
+        "AAC 6\"": {"pcs", "cbm"}
+    },
+    "Tile Chemical": {
+        "Ascolite Fixobond Plus": {"bag"},
+        "Ascolite Genx": {"bag"},
+        "MYK 305": {"bag"},
+        "MYK 315": {"bag"},
+        "Rockfix 100": {"bag"},
+        "Rockfix 200": {"bag"}
+    },
+    "Waterproofing Chemical": {
+        "Dr. Fixit LW Plus 100 Ltr": {"can"},
+        "Dr. Fixit URP 50 Ltr": {"can"},
+        "WP+ 200": {"bottle"},
+        "WP+ 200 1 Ltr": {"bottle"},
+        "WP+ 200 5 Ltr": {"bottle"},
+        "WP+ 200 10 Ltr": {"can"},
+        "WP+ 200 20 Ltr": {"can "},
+        "WP+ 200 50 Ltr": {"can"},
+        "SBR 1 Kg": {"bottle"},
+        "SBR 5 Kg": {"bottle"},
+        "SBR 10 Kg": {"bottle"},
+        "SBR 20 Kg": {"bottle"},
+        "SBR 50 Kg": {"bottle"}
+    },
+    "Block Chemical": {
+        "Rockstar BJM 40kg": {"bag"},
+        "Rockstar BJM 30kg": {"bag"}
+    },
+    "Centring Material": {
+        "Covered Blocks": {"pcs"}
+    },
+    "Loose Cement": {
+        "Birla White Cement 1 Kg": {"kg"},
+        "Birla White Cement 5 Kg": {"kg"},
+        "Birla White Cement 50 Kg": {"kg"},
+        "Grey Cement 1 Kg": {"kg"},
+        "Grey Cement 2 Kg": {"kg"},
+        "Grey Cement 5 Kg": {"kg"},
+        "Grey Cement 10 Kg": {"kg"}
+    }
 }
+
+# Unit conversions — all relative to the smallest unit (pati)
+UNIT_CONVERSIONS = {
+    "pati": 1,
+    "piaggo": 40,
+    "brass": 240  # 1 brass = 6 piaggo = 6 × 40 = 240 pati
+}
+
+def convert_to_base_unit(quantity, unit):
+    """Convert any unit to pati (base unit)"""
+    return quantity * UNIT_CONVERSIONS.get(unit, 1)
+
+def convert_from_base_unit(quantity_in_pati, unit):
+    """Convert pati back to any unit"""
+    return quantity_in_pati / UNIT_CONVERSIONS.get(unit, 1)
 
 EXPENSE_TYPES = ["Staff Salary", "Diesel", "Maintenance", "Shop Rent", "Other"]
 DASHBOARD_PASSWORD = "sunny123"
@@ -300,16 +382,82 @@ if page == "Business Dashboard":
         f_hist = history_df[history_df['date_dt'] >= start_date] if not history_df.empty else history_df
         f_exp = expense_df[expense_df['date_dt'] >= start_date] if not expense_df.empty else expense_df
 
-        total_sales = f_hist[f_hist['transaction_type'] == 'sale']['amount'].sum()
-        total_purchase = f_hist[f_hist['transaction_type'] == 'purchase']['amount'].sum()
-        total_operating_exp = f_exp['amount'].sum()
-        estimated_profit = total_sales - total_purchase - total_operating_exp
+        # Always use ALL history for avg purchase rate calculation (not time filtered)
+        all_purchases = history_df[history_df['transaction_type'] == 'purchase']
 
-        m1, m2, m3, m4 = st.columns(4)
+        
+        # Build avg rates in base units (pati for stone items)
+        avg_rates = {}
+        for (cat, item_type, unit), grp in all_purchases.groupby(['category', 'item_type', 'unit']):
+            total_qty_base = sum(
+                convert_to_base_unit(abs(q), unit) 
+                for q in grp['quantity']
+            )
+            if total_qty_base > 0:
+                # Rate per pati
+                avg_rates[(cat, item_type)] = grp['amount'].sum() / total_qty_base
+
+        # For sales in selected timeframe, calculate cost of goods sold
+        sales_in_period = f_hist[f_hist['transaction_type'] == 'sale']
+        total_sales = sales_in_period['amount'].sum()
+        total_operating_exp = f_exp['amount'].sum()
+
+        # Cost of goods sold = qty sold × avg purchase rate
+        cogs = 0.0
+        skipped_items = []
+        for _, row in sales_in_period.iterrows():
+            key = (row['category'], row['item_type'])
+            if key in avg_rates:
+                # Convert sale qty to base unit for consistent rate calculation
+                qty_base = convert_to_base_unit(abs(row['quantity']), row['unit'])
+                cogs += qty_base * avg_rates[key]
+            else:
+                skipped_items.append(f"{row['item_type']} ({row['unit']})")
+
+        gross_profit = total_sales - cogs
+        net_profit = gross_profit - total_operating_exp
+
+        # Stock Value = current stock qty × avg purchase rate
+        stock_response = supabase.table("stock_summary").select("*").execute()
+        stock_value = 0.0
+        if stock_response.data:
+            for stock_row in stock_response.data:
+                if stock_row['current_stock'] > 0:
+                    key = (stock_row['category'], stock_row['item_type'])
+                    if key in avg_rates:
+                        # Stock is already stored in pati (base unit)
+                        stock_value += stock_row['current_stock'] * avg_rates[key]
+
+        # Total purchases in period just for reference
+        total_purchase_in_period = f_hist[f_hist['transaction_type'] == 'purchase']['amount'].sum()
+
+        m1, m2, m3 = st.columns(3)
         m1.metric("Revenue (Sales)", f"₹{total_sales:,.2f}")
-        m2.metric("Procurement (Purchase)", f"₹{total_purchase:,.2f}")
+        m2.metric("Cost of Goods Sold", f"₹{cogs:,.2f}",
+                  help="Estimated cost of items actually sold in this period, based on average purchase rate")
         m3.metric("Operating Expenses", f"₹{total_operating_exp:,.2f}")
-        m4.metric("Estimated Net Profit", f"₹{estimated_profit:,.2f}")
+
+        st.divider()
+
+        p1, p2, p3 = st.columns(3)
+        p1.metric(
+            "Gross Profit",
+            f"₹{gross_profit:,.2f}",
+            help="Sales Revenue minus Cost of Goods Sold"
+        )
+        p2.metric(
+            "Net Profit (After Expenses)",
+            f"₹{net_profit:,.2f}",
+            help="Gross Profit minus Operating Expenses"
+        )
+        p3.metric(
+            "Current Stock Value",
+            f"₹{stock_value:,.2f}",
+            help="Value of unsold stock at average purchase rate"
+        )
+
+        if total_purchase_in_period > 0:
+            st.caption(f"ℹ️ New stock purchased in this period: ₹{total_purchase_in_period:,.2f}")
 
         st.divider()
         
@@ -367,19 +515,28 @@ elif page == "New Transaction":
             st.write(f"**Total:**")
             st.write(f"₹{qty * rate:,.2f}")
 
-        remarks = st.text_input("Remarks")
-        
+        t_col1, t_col2 = st.columns(2)
+        with t_col1:
+            remarks = st.text_input("Remarks")
+        with t_col2:
+            transport_cost = st.number_input("Transport Cost (₹)", min_value=0.0, step=10.0, help="Extra transport charge billed to client")
+
         if st.button("➕ Add Item to Transaction", use_container_width=True, type="secondary"):
             if not party_name:
                 st.error("Please specify a Party Name")
             else:
                 signed_qty = qty if t_type == "purchase" else -qty
+                total_amount = (qty * rate) + transport_cost
+                remark_with_transport = remarks
+                if transport_cost > 0:
+                    remark_with_transport = f"{remarks} | Transport: ₹{transport_cost:,.0f}".strip(" |")
                 st.session_state.cart.append({
                     "category": cat, "item_type": item, "unit": unit,
-                    "quantity": signed_qty, "rate": rate, "amount": qty * rate,
+                    "quantity": signed_qty, "rate": rate, "amount": total_amount,
                     "transaction_type": t_type, "cash_credit": pay_mode,
-                    "party_name": party_name, "vehicle_name": vehicle, 
-                    "site_name": site_name, "remarks": remarks
+                    "party_name": party_name, "vehicle_name": vehicle,
+                    "site_name": site_name, "remarks": remark_with_transport,
+                    "transport_cost": transport_cost
                 })
                 st.toast("Item added!")
 
@@ -438,7 +595,11 @@ elif page == "New Transaction":
                         st.markdown(f"Qty: **{abs(item['quantity'])}**")
                         st.markdown(f"Rate: **₹{item['rate']:,.2f}**")
                     with c3:
+                        base_amt = abs(item['quantity']) * item['rate']
+                        transport = item.get('transport_cost', 0)
                         st.markdown(f"**₹{abs(item['amount']):,.2f}**")
+                        if transport > 0:
+                            st.caption(f"Item: ₹{base_amt:,.0f} + Transport: ₹{transport:,.0f}")
                         if item.get('remarks'):
                             st.caption(item['remarks'])
                     with c4:
@@ -691,12 +852,23 @@ elif page == "Stock":
             stock_df = stock_df[stock_df['item_type'] == stock_item]
 
         if not stock_df.empty:
+            display_stock = stock_df[['category', 'item_type', 'unit', 'current_stock']].copy()
+            
+            # Add readable conversions for stone items
+            def format_stock(row):
+                if row['unit'] == 'pati':
+                    pati = row['current_stock']
+                    brass = pati / 240
+                    piaggo = pati / 40
+                    return f"{pati:.0f} pati / {piaggo:.2f} piaggo / {brass:.2f} brass"
+                return f"{row['current_stock']:.2f}"
+            
+            display_stock['Balance'] = display_stock.apply(format_stock, axis=1)
+            
             st.dataframe(
-                stock_df[['category', 'item_type', 'unit', 'current_stock']].rename(columns={
+                display_stock[['category', 'item_type', 'Balance']].rename(columns={
                     'category': 'Category',
-                    'item_type': 'Item',
-                    'unit': 'Unit',
-                    'current_stock': 'Balance'
+                    'item_type': 'Item'
                 }),
                 use_container_width=True,
                 hide_index=True
