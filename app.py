@@ -268,8 +268,13 @@ INVENTORY_RULES = {
         "Grey Cement 2 Kg": {"kg"},
         "Grey Cement 5 Kg": {"kg"},
         "Grey Cement 10 Kg": {"kg"}
+    },
+    "Sanla": {
+        "Golden Morchap": {"bag"},
+        "Pure Morchap": {"bag"}
     }
 }
+
 
 # Unit conversions — all relative to the smallest unit (pati)
 UNIT_CONVERSIONS = {
