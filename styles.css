@@ -1,0 +1,652 @@
+/* =====================================================
+   INVENTORY PRO — styles.css
+   Theme: Industrial Clarity
+   - Emerald green  → sales, revenue, positive values
+   - Rose red       → expenses, payables, danger
+   - Amber orange   → pending, warnings, attention
+   - Steel blue     → navigation, info, neutral actions
+   ===================================================== */
+
+/* ─── GOOGLE FONTS + MATERIAL ICONS ─────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Round');
+
+/* ─── FIX: Material Icons sidebar button ────────────── */
+/* This fixes the raw "keyboard_double_arrow_left" text */
+[data-testid="collapsedControl"] span,
+button[data-testid="baseButton-headerNoPadding"] span,
+.material-icons-round,
+.material-icons {
+    font-family: 'Material Icons Round' !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    direction: ltr;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    font-feature-settings: 'liga';
+    -webkit-font-feature-settings: 'liga';
+    text-rendering: optimizeLegibility;
+}
+
+/* ─── FIX: Sidebar overlap / z-index ────────────────── */
+section[data-testid="stSidebar"] {
+    z-index: 999 !important;
+    position: relative !important;
+}
+section[data-testid="stSidebar"] > div {
+    z-index: 999 !important;
+}
+.main .block-container {
+    z-index: 1 !important;
+    position: relative !important;
+}
+/* Prevent expander labels from leaking over sidebar */
+[data-testid="stExpander"] {
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* ─── CSS DESIGN TOKENS ──────────────────────────────── */
+:root {
+    /* Base surfaces */
+    --bg-base:         #0d1117;
+    --bg-surface:      #161b22;
+    --bg-elevated:     #1e2633;
+    --bg-hover:        #232d3d;
+    --bg-border:       #2a3547;
+
+    /* Primary palette */
+    --emerald-bright:  #10b981;
+    --emerald-dim:     #059669;
+    --emerald-glow:    rgba(16, 185, 129, 0.12);
+    --emerald-border:  rgba(16, 185, 129, 0.35);
+
+    --rose-bright:     #f43f5e;
+    --rose-dim:        #e11d48;
+    --rose-glow:       rgba(244, 63, 94, 0.12);
+    --rose-border:     rgba(244, 63, 94, 0.35);
+
+    --amber-bright:    #f59e0b;
+    --amber-dim:       #d97706;
+    --amber-glow:      rgba(245, 158, 11, 0.12);
+    --amber-border:    rgba(245, 158, 11, 0.35);
+
+    --blue-bright:     #3b82f6;
+    --blue-dim:        #2563eb;
+    --blue-glow:       rgba(59, 130, 246, 0.12);
+    --blue-border:     rgba(59, 130, 246, 0.35);
+
+    /* Text */
+    --text-primary:    #e6edf3;
+    --text-secondary:  #8b949e;
+    --text-muted:      #484f58;
+
+    /* Semantic shortcuts */
+    --sale-color:      var(--emerald-bright);
+    --purchase-color:  var(--blue-bright);
+    --expense-color:   var(--rose-bright);
+    --pending-color:   var(--amber-bright);
+
+    /* Font */
+    --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+    /* Radius */
+    --radius-sm:  6px;
+    --radius-md:  10px;
+    --radius-lg:  14px;
+    --radius-xl:  20px;
+}
+
+/* ─── GLOBAL BASE ────────────────────────────────────── */
+html, body, .stApp {
+    background-color: var(--bg-base) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-main) !important;
+}
+
+* {
+    font-family: var(--font-main) !important;
+}
+
+code, pre, .stCode {
+    font-family: var(--font-mono) !important;
+}
+
+/* ─── SIDEBAR ────────────────────────────────────────── */
+section[data-testid="stSidebar"] {
+    background-color: var(--bg-surface) !important;
+    border-right: 1px solid var(--bg-border) !important;
+}
+
+section[data-testid="stSidebar"] * {
+    color: var(--text-secondary) !important;
+}
+
+/* Sidebar title "Go to" */
+section[data-testid="stSidebar"] .stRadio label:first-of-type {
+    font-size: 10px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.12em !important;
+    color: var(--text-muted) !important;
+}
+
+/* Sidebar nav radio items */
+section[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.02em !important;
+    color: var(--text-secondary) !important;
+    transition: color 0.15s ease !important;
+}
+
+/* Active nav item */
+section[data-testid="stSidebar"] .stRadio [aria-checked="true"] [data-testid="stMarkdownContainer"] p {
+    color: var(--emerald-bright) !important;
+}
+
+/* Radio button dot — hide default, style the outer circle */
+section[data-testid="stSidebar"] .stRadio input[type="radio"] {
+    accent-color: var(--emerald-bright) !important;
+}
+
+/* Sidebar warning (pending orders badge) */
+section[data-testid="stSidebar"] .stAlert {
+    background-color: var(--amber-glow) !important;
+    border: 1px solid var(--amber-border) !important;
+    border-radius: var(--radius-md) !important;
+}
+section[data-testid="stSidebar"] .stAlert p {
+    color: var(--amber-bright) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+/* ─── PAGE TITLES ────────────────────────────────────── */
+h1 {
+    color: var(--text-primary) !important;
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+    padding-bottom: 12px !important;
+    border-bottom: 1px solid var(--bg-border) !important;
+    margin-bottom: 24px !important;
+}
+
+h2 {
+    color: var(--text-primary) !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+}
+
+h3 {
+    color: var(--text-secondary) !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+}
+
+/* ─── METRIC CARDS ───────────────────────────────────── */
+/* Label above the number */
+[data-testid="stMetric"] label {
+    color: var(--text-secondary) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
+
+/* The big number */
+[data-testid="stMetricValue"] {
+    color: var(--text-primary) !important;
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    font-variant-numeric: tabular-nums !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Delta value */
+[data-testid="stMetricDelta"] {
+    font-size: 12px !important;
+}
+
+/* Container around each metric */
+[data-testid="stMetric"] {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: 18px 20px !important;
+    transition: border-color 0.2s ease !important;
+}
+
+[data-testid="stMetric"]:hover {
+    border-color: var(--emerald-border) !important;
+}
+
+/* ─── BUTTONS ────────────────────────────────────────── */
+/* Primary (type="primary") */
+.stButton button[kind="primary"],
+button[data-testid="baseButton-primary"] {
+    background-color: var(--emerald-dim) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    letter-spacing: 0.02em !important;
+    padding: 10px 20px !important;
+    transition: all 0.15s ease !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+}
+
+.stButton button[kind="primary"]:hover,
+button[data-testid="baseButton-primary"]:hover {
+    background-color: var(--emerald-bright) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px var(--emerald-glow) !important;
+}
+
+/* Secondary button */
+.stButton button[kind="secondary"],
+button[data-testid="baseButton-secondary"] {
+    background-color: transparent !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    transition: all 0.15s ease !important;
+}
+
+.stButton button[kind="secondary"]:hover,
+button[data-testid="baseButton-secondary"]:hover {
+    background-color: var(--bg-hover) !important;
+    border-color: var(--text-muted) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ─── INPUTS & SELECTS ───────────────────────────────── */
+/* All input types */
+.stTextInput input,
+.stNumberInput input,
+.stDateInput input,
+.stSelectbox select,
+[data-baseweb="input"] input,
+[data-baseweb="select"] div {
+    background-color: var(--bg-elevated) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-md) !important;
+    font-size: 13px !important;
+    transition: border-color 0.15s ease !important;
+}
+
+[data-baseweb="input"]:focus-within,
+[data-baseweb="select"]:focus-within {
+    border-color: var(--emerald-border) !important;
+    box-shadow: 0 0 0 3px var(--emerald-glow) !important;
+}
+
+/* Input labels */
+.stTextInput label,
+.stNumberInput label,
+.stDateInput label,
+.stSelectbox label,
+.stRadio label,
+.stMultiSelect label,
+label[data-testid="stWidgetLabel"] {
+    color: var(--text-secondary) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    margin-bottom: 4px !important;
+}
+
+/* Placeholder text */
+input::placeholder {
+    color: var(--text-muted) !important;
+}
+
+/* Selectbox dropdown */
+[data-baseweb="popover"],
+[data-baseweb="menu"] {
+    background-color: var(--bg-elevated) !important;
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+[data-baseweb="option"] {
+    background-color: var(--bg-elevated) !important;
+    color: var(--text-primary) !important;
+    font-size: 13px !important;
+}
+
+[data-baseweb="option"]:hover,
+[data-baseweb="option"][aria-selected="true"] {
+    background-color: var(--bg-hover) !important;
+    color: var(--emerald-bright) !important;
+}
+
+/* ─── RADIO BUTTONS ──────────────────────────────────── */
+.stRadio [data-testid="stMarkdownContainer"] p {
+    font-size: 13px !important;
+    color: var(--text-secondary) !important;
+}
+
+/* ─── CONTAINERS / CARDS ─────────────────────────────── */
+[data-testid="stVerticalBlockBorderWrapper"] > div,
+div[data-testid="element-container"] > div[class*="st-emotion-cache"][class*="border"] {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-lg) !important;
+}
+
+/* st.container(border=True) */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: var(--radius-lg) !important;
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--bg-border) !important;
+    padding: 4px !important;
+}
+
+/* ─── EXPANDERS ──────────────────────────────────────── */
+[data-testid="stExpander"] {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-lg) !important;
+    overflow: hidden !important;
+}
+
+
+/* ─── TABS ───────────────────────────────────────────── */
+[data-testid="stTabs"] [role="tablist"] {
+    border-bottom: 1px solid var(--bg-border) !important;
+    gap: 0 !important;
+}
+
+[data-testid="stTabs"] button[role="tab"] {
+    color: var(--text-secondary) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    padding: 10px 18px !important;
+    border-radius: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    transition: all 0.15s ease !important;
+    background: transparent !important;
+}
+
+[data-testid="stTabs"] button[role="tab"]:hover {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-hover) !important;
+}
+
+[data-testid="stTabs"] button[aria-selected="true"] {
+    color: var(--emerald-bright) !important;
+    border-bottom-color: var(--emerald-bright) !important;
+    font-weight: 600 !important;
+}
+
+/* ─── DATAFRAMES / TABLES ────────────────────────────── */
+[data-testid="stDataFrame"],
+.stDataFrame {
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-lg) !important;
+    overflow: hidden !important;
+}
+
+[data-testid="stDataFrame"] thead th,
+.stDataFrame thead th {
+    background-color: var(--bg-elevated) !important;
+    color: var(--text-secondary) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    border-bottom: 1px solid var(--bg-border) !important;
+    padding: 10px 14px !important;
+}
+
+[data-testid="stDataFrame"] tbody td,
+.stDataFrame tbody td {
+    background-color: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
+    font-size: 13px !important;
+    border-bottom: 1px solid var(--bg-border) !important;
+    padding: 10px 14px !important;
+    font-variant-numeric: tabular-nums !important;
+}
+
+[data-testid="stDataFrame"] tbody tr:hover td {
+    background-color: var(--bg-hover) !important;
+}
+
+/* ─── ALERTS / INFO BOXES ────────────────────────────── */
+/* st.success */
+[data-testid="stAlertContainer"][data-baseweb="notification"][kind="positive"] {
+    background-color: var(--emerald-glow) !important;
+    border: 1px solid var(--emerald-border) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--emerald-bright) !important;
+}
+
+/* st.warning */
+[data-testid="stAlertContainer"][data-baseweb="notification"][kind="warning"] {
+    background-color: var(--amber-glow) !important;
+    border: 1px solid var(--amber-border) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--amber-bright) !important;
+}
+
+/* st.error */
+[data-testid="stAlertContainer"][data-baseweb="notification"][kind="negative"] {
+    background-color: var(--rose-glow) !important;
+    border: 1px solid var(--rose-border) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--rose-bright) !important;
+}
+
+/* st.info */
+[data-testid="stAlertContainer"][data-baseweb="notification"][kind="info"] {
+    background-color: var(--blue-glow) !important;
+    border: 1px solid var(--blue-border) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--blue-bright) !important;
+}
+
+/* ─── DIVIDER ─────────────────────────────────────────── */
+hr {
+    border-color: var(--bg-border) !important;
+    margin: 20px 0 !important;
+}
+
+/* ─── TOAST NOTIFICATIONS ────────────────────────────── */
+[data-testid="toastContainer"] {
+    background-color: var(--bg-elevated) !important;
+    border: 1px solid var(--emerald-border) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ─── DOWNLOAD BUTTON ────────────────────────────────── */
+[data-testid="stDownloadButton"] button {
+    background-color: var(--blue-dim) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    transition: all 0.15s ease !important;
+}
+
+[data-testid="stDownloadButton"] button:hover {
+    background-color: var(--blue-bright) !important;
+    box-shadow: 0 4px 12px var(--blue-glow) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ─── CAPTION / SMALL TEXT ───────────────────────────── */
+.stCaption,
+small,
+[data-testid="stCaptionContainer"] {
+    color: var(--text-muted) !important;
+    font-size: 11px !important;
+}
+
+/* ─── MARKDOWN TEXT ──────────────────────────────────── */
+[data-testid="stMarkdownContainer"] p {
+    color: var(--text-secondary) !important;
+    font-size: 14px !important;
+    line-height: 1.6 !important;
+}
+
+/* Headings inside markdown */
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3 {
+    color: var(--text-primary) !important;
+}
+
+/* ─── SEMANTIC COLOUR RULES (app-specific) ───────────── */
+
+/* Sale/Revenue → emerald tint */
+[data-sale="true"],
+.sale-indicator {
+    color: var(--emerald-bright) !important;
+}
+
+/* Expense/Payable → rose tint */
+[data-expense="true"],
+.expense-indicator {
+    color: var(--rose-bright) !important;
+}
+
+/* Pending → amber tint */
+[data-pending="true"],
+.pending-indicator {
+    color: var(--amber-bright) !important;
+}
+
+/* ─── CUSTOM SALE/PURCHASE COLOUR CARDS (inline HTML) ── */
+/* These override the inline styles used in New Transaction */
+/* Sale container */
+div[style*="background-color:#f0fff4"] {
+    background-color: var(--emerald-glow) !important;
+    border-color: var(--emerald-bright) !important;
+    color: var(--emerald-bright) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* Purchase container */
+div[style*="background-color:#fff5f5"] {
+    background-color: var(--rose-glow) !important;
+    border-color: var(--rose-bright) !important;
+    color: var(--rose-bright) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* ─── NUMBER INPUTS STEPPER ARROWS ───────────────────── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    opacity: 0.5 !important;
+    filter: invert(1) !important;
+}
+
+/* ─── SCROLLBAR (webkit) ─────────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--bg-border);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* ─── PLOTLY CHARTS (dark mode override) ─────────────── */
+.js-plotly-plot .plotly {
+    background: transparent !important;
+}
+.js-plotly-plot .plotly .svg-container {
+    background: transparent !important;
+}
+
+/* ─── MAIN CONTENT PADDING ───────────────────────────── */
+.main .block-container {
+    padding-top: 2rem !important;
+    padding-left: 2.5rem !important;
+    padding-right: 2.5rem !important;
+    max-width: 1400px !important;
+}
+
+/* ─── MULTISELECT TAGS ───────────────────────────────── */
+[data-baseweb="tag"] {
+    background-color: var(--bg-elevated) !important;
+    border: 1px solid var(--bg-border) !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text-primary) !important;
+    font-size: 12px !important;
+}
+
+/* ─── WHATSAPP SHARE BUTTON OVERRIDE ─────────────────── */
+a[href*="whatsapp"] {
+    background-color: #1a7a45 !important;
+    transition: background-color 0.15s ease !important;
+}
+a[href*="whatsapp"]:hover {
+    background-color: #22a056 !important;
+}
+
+/* ─── PRINT STYLES ───────────────────────────────────── */
+@media print {
+    header,
+    section[data-testid="stSidebar"],
+    .stButton,
+    .no-print,
+    [data-testid="stExpander"],
+    footer,
+    .block-container button {
+        display: none !important;
+    }
+    .main, .block-container {
+        background-color: white !important;
+        color: black !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    th {
+        background-color: #f5f5f5 !important;
+        color: #111 !important;
+        border-bottom: 2px solid #333 !important;
+        padding: 8px !important;
+    }
+    td {
+        border-bottom: 1px solid #ddd !important;
+        padding: 8px !important;
+        color: #111 !important;
+    }
+}
+
+/* Hide raw icon text using both color AND font-size */
+[data-testid="stExpander"] summary {
+    color: transparent !important;
+    font-size: 0 !important;
+}
+
+/* Restore ONLY the label */
+[data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] p {
+    color: var(--text-secondary) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+}
