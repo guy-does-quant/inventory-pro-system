@@ -428,7 +428,10 @@ elif page == "New Transaction":
         h_col1, h_col2, h_col3, h_col4 = st.columns(4)
         with h_col1:
             existing_parties = sorted(history_df['party_name'].unique().tolist()) if not history_df.empty else []
-            sel_party = st.selectbox("Party Name", ["-- New Party --"] + existing_parties)
+            _edit_party = st.session_state.edit_mode_transaction.get('party_name', '') if st.session_state.edit_mode_transaction else ''
+            _party_options = ["-- New Party --"] + existing_parties
+            _party_default = _party_options.index(_edit_party) if _edit_party and _edit_party in _party_options else 0
+            sel_party = st.selectbox("Party Name", _party_options, index=_party_default)
             party_name = st.text_input("Enter New Party").lower() if sel_party == "-- New Party --" else sel_party
         with h_col2:
             auto_site = ""
@@ -438,13 +441,17 @@ elif page == "New Transaction":
                     auto_site = party_history.iloc[0]['site_name']
 
             existing_sites = sorted(history_df['site_name'].dropna().unique().tolist()) if not history_df.empty else []
+            _edit_site = st.session_state.edit_mode_transaction.get('site_name', '') if st.session_state.edit_mode_transaction else ''
+            _site_options = ["-- New Site --"] + existing_sites
 
-            if sel_party != "-- New Party --" and auto_site:
-                site_options = ["-- New Site --"] + existing_sites
-                auto_idx = site_options.index(auto_site) if auto_site in site_options else 0
-                sel_site = st.selectbox("Site Location", site_options, index=auto_idx)
+            if _edit_site and _edit_site in _site_options:
+                _site_default = _site_options.index(_edit_site)
+            elif sel_party != "-- New Party --" and auto_site and auto_site in _site_options:
+                _site_default = _site_options.index(auto_site)
             else:
-                sel_site = st.selectbox("Site Location", ["-- New Site --"] + existing_sites)
+                _site_default = 0
+
+            sel_site = st.selectbox("Site Location", _site_options, index=_site_default)
 
             site_name = st.text_input("Enter New Site").lower() if sel_site == "-- New Site --" else sel_site
         with h_col3:
