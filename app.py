@@ -202,9 +202,9 @@ INVENTORY_RULES = {
         "JSB": {"pati", "brass", "piaggo"}
     },
     "Bricks": {
-        "Cement 4\"": {"pcs"},
-        "Cement 6\"": {"pcs"},
-        "Red Brick": {"pcs"}
+        "Red Brick 4\"": {"pcs"},
+        "Red Brick 6\"": {"pcs"},
+        "Cement 6\"": {"pcs"}
     },
     "AAC Block": {
         "AAC 4\"": {"pcs"},
