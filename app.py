@@ -202,9 +202,9 @@ INVENTORY_RULES = {
         "JSB": {"pati", "brass", "piaggo"}
     },
     "Bricks": {
-        "Red Brick 4\"": {"pcs"},
-        "Red Brick 6\"": {"pcs"},
-        "Cement 6\"": {"pcs"}
+        "Cement 4\"": {"pcs"},
+        "Cement 6\"": {"pcs"},
+        "Red Brick": {"pcs"}
     },
     "AAC Block": {
         "AAC 4\"": {"pcs"},
@@ -568,7 +568,7 @@ elif page == "New Transaction":
                         st.session_state.cart[i].update({
                             "quantity": signed_qty,
                             "rate": new_rate,
-                            "amount": new_qty * new_rate,
+                            "amount": new_qty * new_rate + st.session_state.cart[i].get('transport_cost', 0),
                             "transaction_type": new_type,
                             "cash_credit": new_pay,
                             "remarks": new_remarks
@@ -623,7 +623,7 @@ elif page == "New Transaction":
             now = datetime.now().strftime("%Y-%m-%d %H:%M")
             for entry in st.session_state.cart:
                 insert_transaction((now, entry['category'], entry['item_type'], entry['unit'],
-                                    entry['quantity'], entry['rate'], entry['amount'],
+                                    entry['quantity'], entry['rate'], entry['quantity'] * entry['rate'] + entry.get('transport_cost', 0),
                                     entry['transaction_type'], entry['cash_credit'],
                                     entry['party_name'], entry['vehicle_name'], entry['site_name'],
                                     entry['remarks'], entry.get('mobile_number', '')))
