@@ -12,11 +12,13 @@ URL = "https://cwjoayqbjlerbilbtdom.supabase.co"
 KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3am9heXFiamxlcmJpbGJ0ZG9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzMDMzMDMsImV4cCI6MjA4ODg3OTMwM30.vXNhwjYRXrxh98qUzFMIUbvPMzNPjg7B-ves9Vmyveg"
 supabase: Client = create_client(URL, KEY)
 
+# Note: init_db() is no longer needed as tables are managed in Supabase UI
 def init_db():
-    pass
+    pass 
 
 # --- DB HELPERS ---
 def update_stock(category, item_type, unit, qty_change):
+    # Convert qty to base unit (pati) if it's a stone/crusher item
     if unit in UNIT_CONVERSIONS:
         qty_in_pati = convert_to_base_unit(qty_change, unit)
         store_unit = "pati"
@@ -27,7 +29,7 @@ def update_stock(category, item_type, unit, qty_change):
     res = supabase.table("stock_summary").select("current_stock")\
         .match({"category": category, "item_type": item_type, "unit": store_unit})\
         .execute()
-
+    
     if res.data:
         new_total = res.data[0]['current_stock'] + qty_in_pati
         supabase.table("stock_summary").update({"current_stock": new_total})\
@@ -39,9 +41,10 @@ def update_stock(category, item_type, unit, qty_change):
         }).execute()
 
 def insert_transaction(data):
+    # mapping tuple data to dictionary
     data_dict = {
-        "date": data[0], "category": data[1], "item_type": data[2],
-        "unit": data[3], "quantity": data[4], "rate": data[5],
+        "date": data[0], "category": data[1], "item_type": data[2], 
+        "unit": data[3], "quantity": data[4], "rate": data[5], 
         "amount": data[6], "transaction_type": data[7], "cash_credit": data[8],
         "party_name": data[9], "vehicle_name": data[10], "site_name": data[11], "remarks": data[12],
         "mobile_number": data[13],
@@ -64,7 +67,9 @@ def delete_records(table, record_ids):
             row = supabase.table("transactions").select("category, item_type, unit, quantity").eq("id", rid).execute()
             if row.data:
                 item = row.data[0]
+                # Reverse the effect: negate the stored signed quantity
                 update_stock(item['category'], item['item_type'], item['unit'], -item['quantity'])
+        
         supabase.table(table).update({"is_deleted": True}).eq("id", rid).execute()
 
 def restore_records(table, record_ids):
@@ -73,7 +78,9 @@ def restore_records(table, record_ids):
             row = supabase.table("transactions").select("category, item_type, unit, quantity").eq("id", rid).execute()
             if row.data:
                 item = row.data[0]
-                update_stock(item['category'], item['item_type'], item['unit'], item['quantity'])
+                qty = item['quantity']
+                update_stock(item['category'], item['item_type'], item['unit'], qty)
+        
         supabase.table(table).update({"is_deleted": False}).eq("id", rid).execute()
 
 def insert_pending_order(data):
@@ -109,7 +116,7 @@ def complete_pending_order(order_id, vehicle_name):
             -abs(order['quantity']),
             order['rate'], order['amount'], "sale",
             order['cash_credit'], order['party_name'],
-            vehicle_name, order['site_name'], order['remarks'], ""
+            vehicle_name, order['site_name'], order['remarks']
         ))
         supabase.table("pending_orders").update({"status": "completed"})\
             .eq("id", order_id).execute()
@@ -125,8 +132,8 @@ def load_transactions():
     response = supabase.table("transactions").select("*").eq("is_deleted", False).order("id", desc=True).execute()
     df = pd.DataFrame(response.data)
     if df.empty:
-        return pd.DataFrame(columns=["id", "date", "date_dt", "category", "item_type", "unit",
-                                     "quantity", "rate", "amount", "transaction_type",
+        return pd.DataFrame(columns=["id", "date", "date_dt", "category", "item_type", "unit", 
+                                     "quantity", "rate", "amount", "transaction_type", 
                                      "cash_credit", "party_name", "vehicle_name", "site_name", "remarks", "mobile_number", "is_deleted"])
     df['date_dt'] = pd.to_datetime(df['date'], errors='coerce')
     df['date'] = df['date_dt'].dt.strftime("%Y-%m-%d %H:%M")
@@ -135,6 +142,7 @@ def load_transactions():
 def load_expenses():
     response = supabase.table("expenses").select("*").eq("is_deleted", False).order("id", desc=True).execute()
     df = pd.DataFrame(response.data)
+    # If empty, create empty dataframe with correct columns to prevent crashes
     if df.empty:
         return pd.DataFrame(columns=["id", "date", "expense_type", "amount", "remarks", "is_deleted"])
     df['date_dt'] = pd.to_datetime(df['date'], errors='coerce')
@@ -143,6 +151,7 @@ def load_expenses():
 def load_payments():
     response = supabase.table("payments").select("*").eq("is_deleted", False).order("id", desc=True).execute()
     df = pd.DataFrame(response.data)
+    # If empty, create empty dataframe with correct columns to prevent crashes
     if df.empty:
         return pd.DataFrame(columns=["id", "date", "party_name", "payment_type", "amount", "remarks", "is_deleted"])
     df['date_dt'] = pd.to_datetime(df['date'], errors='coerce')
@@ -151,6 +160,8 @@ def load_payments():
 def generate_bill_pdf(bill_data, party_name, total_val):
     pdf = FPDF()
     pdf.add_page()
+    
+    # Header
     pdf.set_font("Helvetica", "B", 20)
     pdf.cell(0, 12, "INVOICE", ln=True, align="C")
     pdf.ln(2)
@@ -159,6 +170,8 @@ def generate_bill_pdf(bill_data, party_name, total_val):
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 7, f"Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True)
     pdf.ln(5)
+    
+    # Table Header
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("Helvetica", "B", 10)
     col_widths = [38, 38, 25, 20, 30, 35]
@@ -166,6 +179,8 @@ def generate_bill_pdf(bill_data, party_name, total_val):
     for i, h in enumerate(headers):
         pdf.cell(col_widths[i], 8, h, border=1, fill=True)
     pdf.ln()
+    
+    # Table Rows
     pdf.set_font("Helvetica", "", 10)
     for _, row in bill_data.iterrows():
         pdf.cell(col_widths[0], 7, str(row['date'])[:16], border=1)
@@ -175,40 +190,45 @@ def generate_bill_pdf(bill_data, party_name, total_val):
         pdf.cell(col_widths[4], 7, f"{row['rate']:,.2f}", border=1)
         pdf.cell(col_widths[5], 7, f"{abs(row['amount']):,.2f}", border=1)
         pdf.ln()
+    
+    # Total row
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 10, f"Total Amount: Rs {total_val:,.2f}", ln=True, align="R")
+    
+    # Footer
     pdf.ln(5)
     pdf.set_font("Helvetica", "I", 9)
     pdf.cell(0, 7, "Thank you for your business!", ln=True, align="C")
+    
     return bytes(pdf.output())
 
 # --- CONFIGURATION ---
 INVENTORY_RULES = {
     "Cement": {
-        "JK Strong": {"bag"},
-        "JK Super": {"bag"},
-        "Birla Super": {"bag"},
-        "UltraTech": {"bag"},
-        "Shree 43": {"bag"},
+        "JK Strong": {"bag"}, 
+        "JK Super": {"bag"}, 
+        "Birla Super": {"bag"}, 
+        "UltraTech": {"bag"}, 
+        "Shree 43": {"bag"}, 
         "Shree 53": {"bag"}
     },
     "Stone/Crusher": {
-        "Khadi": {"pati", "brass", "piaggo"},
-        "Crush Sand": {"pati", "brass", "piaggo"},
-        "Plaster Sand": {"pati", "brass", "piaggo"},
-        "M Sand": {"pati", "brass", "piaggo"},
-        "Grit": {"pati", "brass", "piaggo"},
-        "JSB": {"pati", "brass", "piaggo"}
+        "Khadi": {"pati", "brass","piaggo"},
+        "Crush Sand": {"pati", "brass","piaggo"},
+        "Plaster Sand": {"pati", "brass","piaggo"},
+        "M Sand": {"pati", "brass","piaggo"},
+        "Grit": {"pati", "brass","piaggo"},
+        "JSB": {"pati", "brass","piaggo"}
     },
     "Bricks": {
         "Cement 4\"": {"pcs"},
-        "Cement 6\"": {"pcs"},
+        "Cement 6\"": {"pcs"}, 
         "Red Brick": {"pcs"}
     },
     "AAC Block": {
         "AAC 4\"": {"pcs"},
-        "AAC 5\"": {"pcs"},
+        "AAC 5\"": {"pcs"}, 
         "AAC 6\"": {"pcs"}
     },
     "Tile Chemical": {
@@ -226,7 +246,7 @@ INVENTORY_RULES = {
         "WP+ 200 1 Ltr": {"bottle"},
         "WP+ 200 5 Ltr": {"bottle"},
         "WP+ 200 10 Ltr": {"can"},
-        "WP+ 200 20 Ltr": {"can"},
+        "WP+ 200 20 Ltr": {"can "},
         "WP+ 200 50 Ltr": {"can"},
         "SBR 1 Kg": {"bottle"},
         "SBR 5 Kg": {"bottle"},
@@ -252,72 +272,106 @@ INVENTORY_RULES = {
     }
 }
 
+# Unit conversions — all relative to the smallest unit (pati)
 UNIT_CONVERSIONS = {
     "pati": 1,
     "piaggo": 40,
-    "brass": 240
+    "brass": 240  # 1 brass = 6 piaggo = 6 × 40 = 240 pati
 }
 
 def convert_to_base_unit(quantity, unit):
+    """Convert any unit to pati (base unit)"""
     return quantity * UNIT_CONVERSIONS.get(unit, 1)
 
 def convert_from_base_unit(quantity_in_pati, unit):
+    """Convert pati back to any unit"""
     return quantity_in_pati / UNIT_CONVERSIONS.get(unit, 1)
 
 EXPENSE_TYPES = ["Staff Salary", "Diesel", "Maintenance", "Shop Rent", "Other"]
 DASHBOARD_PASSWORD = "sunny123"
 
-# --- APP CONFIG ---
+# --- APP CONFIG & PRINT CSS ---
 st.set_page_config(page_title="Inventory Pro", layout="wide")
 
-with open("styles.css", encoding="utf-8") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+st.markdown("""
+    <style>
+    @media print {
+        header, [data-testid="stSidebar"], .stButton, .no-print, .stMetric, 
+        [data-testid="stExpander"], footer, .block-container button {
+            display: none !important;
+        }
+        .e16onlo31, a { display: none !important; }
+        .main, .block-container, [data-testid="stVerticalBlock"] {
+            background-color: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        [data-testid="stElementContainer"] {
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            margin-top: 20px !important;
+        }
+        th {
+            background-color: #f8f9fa !important;
+            border-bottom: 2px solid #000 !important;
+            text-align: left !important;
+            padding: 8px !important;
+        }
+        td {
+            border-bottom: 1px solid #eee !important;
+            padding: 8px !important;
+        }
+    }
+    .share-btn {
+        background-color: #25D366;
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        font-size: 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 8px;
+    }
+    .share-btn:hover { background-color: #1ebe5d; }
+    </style>
+""", unsafe_allow_html=True)
 
-# --- SESSION STATE ---
+
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 if 'editing_index' not in st.session_state:
     st.session_state.editing_index = None
-if 'edit_mode_transaction' not in st.session_state:
-    st.session_state.edit_mode_transaction = None
 
-# --- DATA LOADING ---
+# --- DATA LOADING (Fresh load every rerun) ---
 history_df = load_transactions()
 expense_df = load_expenses()
 payments_df = load_payments()
 pending_df = load_pending_orders()
 
 # --- SIDEBAR NAV ---
-_nav_options = [
-    "Business Dashboard", "New Transaction", "Add Expenses",
-    "View History", "Stock", "Credit & Payments", "Pending Orders", "Bill Generator"
-]
-if 'nav_page' not in st.session_state:
-    st.session_state.nav_page = _nav_options[0]
+page = st.sidebar.radio("Go to", ["Business Dashboard", "New Transaction", "Add Expenses", "View History", "Stock", "Credit & Payments", "Pending Orders", "Bill Generator"])
 
-page = st.sidebar.radio(
-    "Go to",
-    _nav_options,
-    index=_nav_options.index(st.session_state.nav_page) if st.session_state.nav_page in _nav_options else 0
-)
-st.session_state.nav_page = page
-
+# Show pending count badge in sidebar
 if not pending_df.empty:
     st.sidebar.warning(f"⏳ {len(pending_df)} order(s) pending delivery")
 
-# =============================================================================
-# PAGE: BUSINESS DASHBOARD
-# =============================================================================
+# --- PAGE: BUSINESS DASHBOARD ---
 if page == "Business Dashboard":
     st.title("📈 Business Intelligence Dashboard")
-
+    
+    # Password Protection
     pwd_input = st.sidebar.text_input("Enter Dashboard Password", type="password")
-
+    
     if pwd_input == DASHBOARD_PASSWORD:
         t_col1, t_col2 = st.columns([1, 3])
         with t_col1:
             time_range = st.selectbox("Select Timeframe", ["Last 7 Days", "Last 30 Days", "Last 90 Days", "Year to Date", "All Time"])
-
+        
         now = datetime.now()
         if time_range == "Last 7 Days": start_date = now - timedelta(days=7)
         elif time_range == "Last 30 Days": start_date = now - timedelta(days=30)
@@ -325,26 +379,37 @@ if page == "Business Dashboard":
         elif time_range == "Year to Date": start_date = datetime(now.year, 1, 1)
         else: start_date = datetime(2000, 1, 1)
 
+        # Filtering for dashboard metrics only
         f_hist = history_df[history_df['date_dt'] >= start_date] if not history_df.empty else history_df
         f_exp = expense_df[expense_df['date_dt'] >= start_date] if not expense_df.empty else expense_df
 
+        # Always use ALL history for avg purchase rate calculation (not time filtered)
         all_purchases = history_df[history_df['transaction_type'] == 'purchase']
 
+        
+        # Build avg rates in base units (pati for stone items)
         avg_rates = {}
         for (cat, item_type, unit), grp in all_purchases.groupby(['category', 'item_type', 'unit']):
-            total_qty_base = sum(convert_to_base_unit(abs(q), unit) for q in grp['quantity'])
+            total_qty_base = sum(
+                convert_to_base_unit(abs(q), unit) 
+                for q in grp['quantity']
+            )
             if total_qty_base > 0:
+                # Rate per pati
                 avg_rates[(cat, item_type)] = grp['amount'].sum() / total_qty_base
 
+        # For sales in selected timeframe, calculate cost of goods sold
         sales_in_period = f_hist[f_hist['transaction_type'] == 'sale']
         total_sales = sales_in_period['amount'].sum()
         total_operating_exp = f_exp['amount'].sum()
 
+        # Cost of goods sold = qty sold × avg purchase rate
         cogs = 0.0
         skipped_items = []
         for _, row in sales_in_period.iterrows():
             key = (row['category'], row['item_type'])
             if key in avg_rates:
+                # Convert sale qty to base unit for consistent rate calculation
                 qty_base = convert_to_base_unit(abs(row['quantity']), row['unit'])
                 cogs += qty_base * avg_rates[key]
             else:
@@ -353,6 +418,7 @@ if page == "Business Dashboard":
         gross_profit = total_sales - cogs
         net_profit = gross_profit - total_operating_exp
 
+        # Stock Value = current stock qty × avg purchase rate
         stock_response = supabase.table("stock_summary").select("*").execute()
         stock_value = 0.0
         if stock_response.data:
@@ -360,27 +426,42 @@ if page == "Business Dashboard":
                 if stock_row['current_stock'] > 0:
                     key = (stock_row['category'], stock_row['item_type'])
                     if key in avg_rates:
+                        # Stock is already stored in pati (base unit)
                         stock_value += stock_row['current_stock'] * avg_rates[key]
 
+        # Total purchases in period just for reference
         total_purchase_in_period = f_hist[f_hist['transaction_type'] == 'purchase']['amount'].sum()
 
         m1, m2, m3 = st.columns(3)
         m1.metric("Revenue (Sales)", f"₹{total_sales:,.2f}")
-        m2.metric("Cost of Goods Sold", f"₹{cogs:,.2f}", help="Estimated cost based on average purchase rate")
+        m2.metric("Cost of Goods Sold", f"₹{cogs:,.2f}",
+                  help="Estimated cost of items actually sold in this period, based on average purchase rate")
         m3.metric("Operating Expenses", f"₹{total_operating_exp:,.2f}")
 
         st.divider()
 
         p1, p2, p3 = st.columns(3)
-        p1.metric("Gross Profit", f"₹{gross_profit:,.2f}", help="Sales Revenue minus Cost of Goods Sold")
-        p2.metric("Net Profit (After Expenses)", f"₹{net_profit:,.2f}", help="Gross Profit minus Operating Expenses")
-        p3.metric("Current Stock Value", f"₹{stock_value:,.2f}", help="Value of unsold stock at average purchase rate")
+        p1.metric(
+            "Gross Profit",
+            f"₹{gross_profit:,.2f}",
+            help="Sales Revenue minus Cost of Goods Sold"
+        )
+        p2.metric(
+            "Net Profit (After Expenses)",
+            f"₹{net_profit:,.2f}",
+            help="Gross Profit minus Operating Expenses"
+        )
+        p3.metric(
+            "Current Stock Value",
+            f"₹{stock_value:,.2f}",
+            help="Value of unsold stock at average purchase rate"
+        )
 
         if total_purchase_in_period > 0:
             st.caption(f"ℹ️ New stock purchased in this period: ₹{total_purchase_in_period:,.2f}")
 
         st.divider()
-
+        
         c1, c2 = st.columns(2)
         with c1:
             st.subheader("Sales vs. Expenses Trend")
@@ -388,7 +469,7 @@ if page == "Business Dashboard":
                 sales_trend = f_hist[f_hist['transaction_type'] == 'sale'].groupby(f_hist['date_dt'].dt.date)['amount'].sum().reset_index()
                 fig = px.line(sales_trend, x='date_dt', y='amount', title="Daily Revenue")
                 st.plotly_chart(fig, width='stretch')
-
+        
         with c2:
             st.subheader("Cash vs. Credit Sales Split")
             if not f_hist.empty:
@@ -401,58 +482,33 @@ if page == "Business Dashboard":
         else:
             st.warning("🔒 Please enter the password in the sidebar to view sensitive financial data.")
 
-# =============================================================================
-# PAGE: NEW TRANSACTION
-# =============================================================================
+# --- PAGE: NEW TRANSACTION ---
 elif page == "New Transaction":
     st.title("📝 New Transaction")
-
-    # ── EDIT MODE BANNER ──────────────────────────────────────────────────────
-    if st.session_state.edit_mode_transaction:
-        edit_data = st.session_state.edit_mode_transaction
-        st.warning(f"✏️ **Edit Mode** — Editing transaction ID `{edit_data['original_id']}` for **{edit_data['party_name']}**. Original will be deleted when you save.")
-
-        if not st.session_state.cart:
-            st.session_state.cart = [edit_data.copy()]
-            delete_records("transactions", [edit_data['original_id']])
-            st.info("Original record removed. Make your changes below and press Save.")
-
-        if st.button("🚫 Cancel Edit (restore original)", type="secondary"):
-            restore_records("transactions", [edit_data['original_id']])
-            st.session_state.edit_mode_transaction = None
-            st.session_state.cart = []
-            st.rerun()
-
-    # ── BILL HEADER ───────────────────────────────────────────────────────────
+    
     with st.expander("👤 Bill Header Details (Party & Site)", expanded=True):
         h_col1, h_col2, h_col3, h_col4 = st.columns(4)
         with h_col1:
             existing_parties = sorted(history_df['party_name'].unique().tolist()) if not history_df.empty else []
-            _edit_party = st.session_state.edit_mode_transaction.get('party_name', '') if st.session_state.edit_mode_transaction else ''
-            _party_options = ["-- New Party --"] + existing_parties
-            _party_default = _party_options.index(_edit_party) if _edit_party and _edit_party in _party_options else 0
-            sel_party = st.selectbox("Party Name", _party_options, index=_party_default)
+            sel_party = st.selectbox("Party Name", ["-- New Party --"] + existing_parties)
             party_name = st.text_input("Enter New Party").lower() if sel_party == "-- New Party --" else sel_party
         with h_col2:
+            # Auto-suggest last used site for selected party
             auto_site = ""
             if sel_party != "-- New Party --" and not history_df.empty:
                 party_history = history_df[history_df['party_name'] == sel_party].dropna(subset=['site_name'])
                 if not party_history.empty:
                     auto_site = party_history.iloc[0]['site_name']
-
+            
             existing_sites = sorted(history_df['site_name'].dropna().unique().tolist()) if not history_df.empty else []
-            _edit_site = st.session_state.edit_mode_transaction.get('site_name', '') if st.session_state.edit_mode_transaction else ''
-            _site_options = ["-- New Site --"] + existing_sites
-
-            if _edit_site and _edit_site in _site_options:
-                _site_default = _site_options.index(_edit_site)
-            elif sel_party != "-- New Party --" and auto_site and auto_site in _site_options:
-                _site_default = _site_options.index(auto_site)
+            
+            if sel_party != "-- New Party --" and auto_site:
+                site_options = ["-- New Site --"] + existing_sites
+                auto_idx = site_options.index(auto_site) if auto_site in site_options else 0
+                sel_site = st.selectbox("Site Location", site_options, index=auto_idx)
             else:
-                _site_default = 0
-
-            sel_site = st.selectbox("Site Location", _site_options, index=_site_default)
-
+                sel_site = st.selectbox("Site Location", ["-- New Site --"] + existing_sites)
+            
             site_name = st.text_input("Enter New Site").lower() if sel_site == "-- New Site --" else sel_site
         with h_col3:
             VEHICLES = ["MH12DT4738", "MH12LT9760", "MH12ET7413", "MH12MV4032"]
@@ -464,6 +520,7 @@ elif page == "New Transaction":
 
     st.subheader("🛒 Add Items")
 
+    # Transaction type selector OUTSIDE the container so color can change
     t_type = st.radio(
         "Transaction Type",
         ["🟢  SALE  (Outgoing Stock)", "🔴  PURCHASE  (Incoming Stock)"],
@@ -473,12 +530,13 @@ elif page == "New Transaction":
     is_sale = "SALE" in t_type
     t_type_val = "sale" if is_sale else "purchase"
 
+    # Dynamic background color based on type
     bg_color = "#f0fff4" if is_sale else "#fff5f5"
     border_color = "#38a169" if is_sale else "#e53e3e"
     label = "🟢 SALE — Stock going OUT to client" if is_sale else "🔴 PURCHASE — Stock coming IN from supplier"
 
     st.markdown(f"""
-        <div style="background-color:{bg_color}; border-left: 5px solid {border_color};
+        <div style="background-color:{bg_color}; border-left: 5px solid {border_color}; 
                     padding: 8px 16px; border-radius: 6px; margin-bottom: 8px; font-weight: 600;">
             {label}
         </div>
@@ -568,7 +626,7 @@ elif page == "New Transaction":
                         st.session_state.cart[i].update({
                             "quantity": signed_qty,
                             "rate": new_rate,
-                            "amount": new_qty * new_rate + st.session_state.cart[i].get('transport_cost', 0),
+                            "amount": new_qty * new_rate,
                             "transaction_type": new_type,
                             "cash_credit": new_pay,
                             "remarks": new_remarks
@@ -586,7 +644,7 @@ elif page == "New Transaction":
                     item_border = "#38a169" if is_sale_item else "#e53e3e"
                     item_icon = "🟢" if is_sale_item else "🔴"
                     st.markdown(f"""
-                        <div style="background:{item_color}; border-left:4px solid {item_border};
+                        <div style="background:{item_color}; border-left:4px solid {item_border}; 
                                     padding:4px 10px; border-radius:4px; margin-bottom:4px; font-size:13px;">
                             {item_icon} {'SALE' if is_sale_item else 'PURCHASE'}
                         </div>
@@ -623,13 +681,12 @@ elif page == "New Transaction":
             now = datetime.now().strftime("%Y-%m-%d %H:%M")
             for entry in st.session_state.cart:
                 insert_transaction((now, entry['category'], entry['item_type'], entry['unit'],
-                                    entry['quantity'], entry['rate'], entry['quantity'] * entry['rate'] + entry.get('transport_cost', 0),
+                                    entry['quantity'], entry['rate'], entry['amount'],
                                     entry['transaction_type'], entry['cash_credit'],
-                                    entry['party_name'], entry['vehicle_name'], entry['site_name'],
-                                    entry['remarks'], entry.get('mobile_number', '')))
+                                    entry['party_name'], entry['vehicle_name'], entry['site_name'], entry['remarks'],
+                                    entry.get('mobile_number', '')))
             st.session_state.cart = []
             st.session_state.editing_index = None
-            st.session_state.edit_mode_transaction = None
             st.success("Transaction recorded successfully!")
             st.rerun()
 
@@ -653,9 +710,7 @@ elif page == "New Transaction":
             st.session_state.editing_index = None
             st.rerun()
 
-# =============================================================================
-# PAGE: ADD EXPENSES
-# =============================================================================
+# --- PAGE: ADD EXPENSES ---
 elif page == "Add Expenses":
     st.title("💸 Record Daily Expenses")
     with st.container(border=True):
@@ -666,16 +721,14 @@ elif page == "Add Expenses":
         with e_col2:
             exp_date = st.date_input("Date", value=datetime.now().date())
             exp_rem = st.text_input("Description / Remarks")
-
+            
         if st.button("💾 Save Expense", type="primary", width='stretch'):
             if exp_amt > 0:
                 insert_expense((exp_date.strftime("%Y-%m-%d %H:%M"), exp_type, exp_amt, exp_rem))
                 st.success(f"Successfully recorded ₹{exp_amt} for {exp_type}")
                 st.rerun()
 
-# =============================================================================
-# PAGE: VIEW HISTORY
-# =============================================================================
+# --- PAGE: VIEW HISTORY ---
 elif page == "View History":
     st.title("📜 History Ledger")
 
@@ -689,19 +742,24 @@ elif page == "View History":
         selected_party = st.selectbox("Filter by Party", party_list)
     with f_col3:
         time_filter = st.selectbox("Filter by Time", [
-            "All Time", "Today", "Yesterday",
-            "Last 7 Days", "Last 30 Days", "This Month", "Last Month"
+            "All Time",
+            "Today",
+            "Yesterday",
+            "Last 7 Days",
+            "Last 30 Days",
+            "This Month",
+            "Last Month"
         ])
 
-    tab_sale, tab_purchase, tab_exp, tab_pay, tab_all = st.tabs([
-        "💰 Sales", "🛒 Purchases", "💸 Expenses", "💳 Payments", "📑 All Transactions"
-    ])
+    tab_sale, tab_purchase, tab_exp, tab_pay, tab_all = st.tabs(["💰 Sales", "🛒 Purchases", "💸 Expenses", "💳 Payments", "📑 All Transactions"])
 
-    filtered_history = history_df.copy()
+    filtered_history = history_df
 
+    # Time filter
     if not filtered_history.empty:
         now = datetime.now()
         today = now.date()
+
         if time_filter == "Today":
             filtered_history = filtered_history[filtered_history['date_dt'].dt.date == today]
         elif time_filter == "Yesterday":
@@ -722,13 +780,13 @@ elif page == "View History":
                 (filtered_history['date_dt'].dt.year == last_month.year)
             ]
 
+    # Party filter
     if selected_party != "All Parties":
         filtered_history = filtered_history[filtered_history['party_name'] == selected_party]
 
+    # Search filter
     if search:
-        filtered_history = filtered_history[
-            filtered_history.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)
-        ]
+        filtered_history = filtered_history[filtered_history.apply(lambda row: search.lower() in row.astype(str).str.lower().values, axis=1)]
 
     HIDE_COLS = ["created_at", "is_deleted", "date_dt"]
 
@@ -737,8 +795,6 @@ elif page == "View History":
         if not sales_df.empty:
             sales_df['quantity'] = sales_df['quantity'].abs()
             st.dataframe(sales_df.drop(columns=[c for c in HIDE_COLS if c in sales_df.columns]), width='stretch', hide_index=True)
-        else:
-            st.info("No sales found.")
 
     with tab_purchase:
         purchase_df = filtered_history[filtered_history['transaction_type'] == 'purchase']
@@ -773,74 +829,13 @@ elif page == "View History":
     with tab_all:
         st.dataframe(filtered_history.drop(columns=[c for c in HIDE_COLS if c in filtered_history.columns]), width='stretch', hide_index=True)
 
-    # ── EDIT TRANSACTION ──────────────────────────────────────────────────────
-    st.divider()
-    st.subheader("✏️ Edit a Transaction")
-
-    with st.expander("Select a transaction to edit"):
-        if history_df.empty:
-            st.info("No transactions found.")
-        else:
-            edit_df = history_df.copy()
-            edit_df['label'] = (
-                edit_df['id'].astype(str) + " | " +
-                edit_df['date'].astype(str).str[:16] + " | " +
-                edit_df['party_name'] + " — " +
-                edit_df['item_type'] + " (" +
-                edit_df['transaction_type'].str.upper() + ") ₹" +
-                edit_df['amount'].abs().astype(int).astype(str)
-            )
-            selected_edit_label = st.selectbox(
-                "Choose transaction",
-                ["-- Select --"] + edit_df['label'].tolist(),
-                key="edit_selector"
-            )
-
-            if selected_edit_label != "-- Select --":
-                selected_id = int(selected_edit_label.split(" | ")[0])
-                row = edit_df[edit_df['id'] == selected_id].iloc[0]
-
-                with st.container(border=True):
-                    c1, c2, c3 = st.columns(3)
-                    c1.markdown(f"**Party:** {row['party_name']}")
-                    c1.markdown(f"**Site:** {row.get('site_name', '—')}")
-                    c2.markdown(f"**Item:** {row['item_type']} ({row['category']})")
-                    c2.markdown(f"**Qty:** {abs(row['quantity'])} {row['unit']}")
-                    c3.markdown(f"**Rate:** ₹{row['rate']:,.2f}")
-                    c3.markdown(f"**Amount:** ₹{abs(row['amount']):,.2f}")
-
-                st.warning("⚠️ Editing will delete the original record and let you re-save it with changes. Stock will be adjusted automatically.")
-
-                if st.button("✏️ Load this transaction for editing", type="primary", width='stretch'):
-                    st.session_state.edit_mode_transaction = {
-                        "original_id": int(row['id']),
-                        "category": row['category'],
-                        "item_type": row['item_type'],
-                        "unit": row['unit'],
-                        "quantity": row['quantity'],
-                        "rate": row['rate'],
-                        "amount": row['amount'],
-                        "transaction_type": row['transaction_type'],
-                        "cash_credit": row['cash_credit'],
-                        "party_name": row['party_name'],
-                        "vehicle_name": row.get('vehicle_name', ''),
-                        "site_name": row.get('site_name', ''),
-                        "remarks": row.get('remarks', ''),
-                        "transport_cost": 0,
-                        "mobile_number": row.get('mobile_number', '')
-                    }
-                    st.session_state.nav_page = "New Transaction"
-                    st.session_state.cart = []
-                    st.rerun()
-
-    # ── DELETE TOOL ───────────────────────────────────────────────────────────
     st.divider()
     st.subheader("🗑️ Universal Delete Tool")
-
+    
     with st.expander("Danger Zone - Remove Records"):
         target_table = st.selectbox(
-            "1. Select Category",
-            ["transactions", "expenses", "payments"],
+            "1. Select Category", 
+            ["transactions", "expenses", "payments"], 
             format_func=lambda x: x.capitalize()
         )
 
@@ -861,41 +856,40 @@ elif page == "View History":
             st.warning(f"⚠️ You are about to permanently delete {len(ids_to_delete)} record(s). This cannot be undone.")
             if target_table == "transactions":
                 st.info("Stock levels will be automatically adjusted.")
-
+            
             if st.button(f"Confirm Delete {len(ids_to_delete)} Records", type="primary", width='stretch'):
                 delete_records(target_table, ids_to_delete)
                 st.success(f"Successfully removed selected records from {target_table}.")
                 st.rerun()
-
+        
+        # ← Back to expander level (not inside if ids_to_delete)
         st.divider()
         st.markdown("**↩️ Undo / Restore Deleted Records**")
-
+        
         deleted_data = load_deleted_records(target_table)
-
+        
         if not deleted_data:
             st.info("No deleted records to restore.")
         else:
             deleted_df = pd.DataFrame(deleted_data)
-
+            
             if target_table == "transactions":
                 deleted_df['label'] = deleted_df['id'].astype(str) + ": " + deleted_df['party_name'] + " - " + deleted_df['item_type'] + " (₹" + deleted_df['amount'].astype(str) + ") [DELETED]"
             elif target_table == "expenses":
                 deleted_df['label'] = deleted_df['id'].astype(str) + ": " + deleted_df['expense_type'] + " (₹" + deleted_df['amount'].astype(str) + ") [DELETED]"
             else:
                 deleted_df['label'] = deleted_df['id'].astype(str) + ": " + deleted_df['party_name'] + " [" + deleted_df['payment_type'] + "] (₹" + deleted_df['amount'].astype(str) + ") [DELETED]"
-
+            
             restore_labels = st.multiselect("Select records to restore", deleted_df['label'].tolist(), key="restore_select")
             ids_to_restore = [int(label.split(":")[0]) for label in restore_labels]
-
+            
             if ids_to_restore:
                 if st.button(f"↩️ Restore {len(ids_to_restore)} Record(s)", type="secondary", width='stretch'):
                     restore_records(target_table, ids_to_restore)
                     st.success(f"Successfully restored {len(ids_to_restore)} record(s)!")
                     st.rerun()
 
-# =============================================================================
-# PAGE: STOCK
-# =============================================================================
+# --- PAGE: STOCK ---
 elif page == "Stock":
     st.title("📦 Inventory Stock")
 
@@ -922,7 +916,8 @@ elif page == "Stock":
 
         if not stock_df.empty:
             display_stock = stock_df[['category', 'item_type', 'unit', 'current_stock']].copy()
-
+            
+            # Add readable conversions for stone items
             def format_stock(row):
                 if row['unit'] == 'pati':
                     pati = row['current_stock']
@@ -930,9 +925,9 @@ elif page == "Stock":
                     piaggo = pati / 40
                     return f"{pati:.0f} pati / {piaggo:.2f} piaggo / {brass:.2f} brass"
                 return f"{row['current_stock']:.2f}"
-
+            
             display_stock['Balance'] = display_stock.apply(format_stock, axis=1)
-
+            
             st.dataframe(
                 display_stock[['category', 'item_type', 'Balance']].rename(columns={
                     'category': 'Category',
@@ -946,9 +941,7 @@ elif page == "Stock":
     else:
         st.info("📦 Your inventory is currently empty. Add a 'Purchase' in New Transactions to see stock here!")
 
-# =============================================================================
-# PAGE: CREDIT & PAYMENTS
-# =============================================================================
+# --- PAGE: CREDIT & PAYMENTS ---
 elif page == "Credit & Payments":
     st.title("💳 Credit & Payments")
 
@@ -981,6 +974,7 @@ elif page == "Credit & Payments":
                 total_rec += max(0, net_receivable)
                 total_pay += max(0, net_payable)
 
+    # RECORD PAYMENT UI
     with st.expander("💳 Record New Payment Settlement", expanded=False):
         if not outstanding_parties:
             st.info("No parties currently have an outstanding balance.")
@@ -1013,7 +1007,11 @@ elif page == "Credit & Payments":
                     help_text = "Suppliers you owe money to"
 
                 if filtered_parties:
-                    pay_party = st.selectbox("Select Party", filtered_parties, help=help_text)
+                    pay_party = st.selectbox(
+                        "Select Party",
+                        filtered_parties,
+                        help=help_text
+                    )
                     party_detail = next((d for d in detailed_list if d['Party Name'] == pay_party), None)
                     if party_detail:
                         if db_type == "Inward":
@@ -1040,6 +1038,7 @@ elif page == "Credit & Payments":
                 else:
                     st.warning("Please enter an amount greater than 0.")
 
+    # METRICS
     m1, m2, m3 = st.columns(3)
     m1.metric("Total Net Receivable", f"₹{total_rec:,.2f}")
     m2.metric("Total Net Payable", f"₹{total_pay:,.2f}")
@@ -1068,9 +1067,8 @@ elif page == "Credit & Payments":
     else:
         st.success("✅ All balances are clear!")
 
-# =============================================================================
-# PAGE: PENDING ORDERS
-# =============================================================================
+        
+# --- PAGE: PENDING ORDERS ---
 elif page == "Pending Orders":
     st.title("⏳ Pending Orders")
 
@@ -1106,16 +1104,14 @@ elif page == "Pending Orders":
                     d1, d2 = st.columns(2)
                     if d1.button("✅ Delivered", key=f"done_{order['id']}", type="primary", width='stretch'):
                         complete_pending_order(order['id'], delivery_vehicle)
-                        st.success("Order marked as delivered and added to transactions!")
+                        st.success(f"Order marked as delivered and added to transactions!")
                         st.rerun()
                     if d2.button("❌ Cancel", key=f"cancel_{order['id']}", width='stretch'):
                         delete_pending_order(order['id'])
                         st.warning("Pending order cancelled.")
                         st.rerun()
+# --- PAGE: BILL GENERATOR ---
 
-# =============================================================================
-# PAGE: BILL GENERATOR
-# =============================================================================
 elif page == "Bill Generator":
     st.title("🧾 Smart Bill Generator")
     bill_data = pd.DataFrame()
@@ -1166,7 +1162,7 @@ elif page == "Bill Generator":
                 try:
                     id_list = [int(i.strip()) for i in ids.split(",") if i.strip().isdigit()]
                     bill_data = history_df[history_df['id'].isin(id_list)].copy()
-                except Exception:
+                except:
                     st.error("Invalid ID format. Please use numbers separated by commas.")
 
     if not bill_data.empty:
@@ -1189,6 +1185,8 @@ elif page == "Bill Generator":
 
         st.divider()
 
+        # Build bill text for sharing
+        import json
         bill_lines = "\n".join([
             f"• {row['item_type']} | Qty: {int(abs(row['quantity']))} {row['unit']} | Rate: ₹{row['rate']:,.0f} | Amt: ₹{abs(row['amount']):,.0f}"
             for _, row in display_bill.iterrows()
@@ -1203,7 +1201,15 @@ Date: {datetime.now().strftime('%Y-%m-%d')}
 
 Sent via Inventory Pro"""
 
-        pdf_bytes = generate_bill_pdf(display_bill, bill_data.iloc[0]['party_name'], total_val)
+        share_text_js = json.dumps(share_text)
+        party_name_js = json.dumps(bill_data.iloc[0]['party_name'])
+
+        # PDF Generation
+        pdf_bytes = generate_bill_pdf(
+            display_bill,
+            bill_data.iloc[0]['party_name'],
+            total_val
+        )
         fname = f"Invoice_{bill_data.iloc[0]['party_name'].replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
 
         col1, col2 = st.columns(2)
@@ -1222,7 +1228,7 @@ Sent via Inventory Pro"""
             import urllib.parse
             encoded_text = urllib.parse.quote(share_text)
             whatsapp_url = f"https://web.whatsapp.com/send?text={encoded_text}"
-
+            
             st.markdown(f"""
                 <a href="{whatsapp_url}" target="_blank" rel="noopener noreferrer"
                    style="
@@ -1243,5 +1249,5 @@ Sent via Inventory Pro"""
                 </a>
             """, unsafe_allow_html=True)
 
-        st.info("💡 On mobile: Share button opens native share sheet. On desktop: opens WhatsApp Web.", icon="📱")
+        st.info("💡 On mobile: Share button opens native share sheet (WhatsApp, Telegram, etc). On desktop: opens WhatsApp Web as fallback.", icon="📱")
         st.info("💡 Press **Ctrl + P** to print directly from browser.", icon="⌨️")
