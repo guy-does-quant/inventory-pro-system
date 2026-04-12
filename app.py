@@ -249,6 +249,9 @@ INVENTORY_RULES = {
         "Grey Cement 2 Kg": {"kg"},
         "Grey Cement 5 Kg": {"kg"},
         "Grey Cement 10 Kg": {"kg"}
+    },
+    "Sanla": {
+        "Sanla": {"bag"}
     }
 }
 
@@ -325,6 +328,9 @@ DEFAULT_RATES = {
     # Centring Material
     ("Centring Material", "Covered Blocks", "box"): 400,
     ("Centring Material", "Covered Blocks", "pcs"): 4,
+
+    # Sanla (per bag)
+    ("Sanla", "Sanla", "bag"): 100,
 }
 
 def convert_to_base_unit(quantity, unit):
@@ -353,6 +359,8 @@ if 'edit_mode_expense' not in st.session_state:
     st.session_state.edit_mode_expense = None
 if 'edit_mode_payment' not in st.session_state:
     st.session_state.edit_mode_payment = None
+if 'inline_save_counter' not in st.session_state:
+    st.session_state.inline_save_counter = 0
 
 # --- DATA LOADING ---
 history_df = load_transactions()
@@ -403,14 +411,26 @@ if page == "Business Dashboard":
 
         all_purchases = history_df[history_df['transaction_type'] == 'purchase']
 
-        avg_rates = {}
+        # Build avg cost per base unit — accumulate numerator/denominator across all unit groups
+        # so that e.g. Khadi purchased in both 'brass' and 'piaggo' merges into a single avg rate.
+        # Use qty*rate (not `amount`) to exclude transport surcharges from the cost basis.
+        _rate_num = {}  # (cat, item_type) -> total cost (excl. transport)
+        _rate_den = {}  # (cat, item_type) -> total qty in base unit
         for (cat, item_type, unit), grp in all_purchases.groupby(['category', 'item_type', 'unit']):
-            total_qty_base = sum(convert_to_base_unit(abs(q), unit) for q in grp['quantity'])
-            if total_qty_base > 0:
-                avg_rates[(cat, item_type)] = grp['amount'].sum() / total_qty_base
+            for _, pr in grp.iterrows():
+                qty_base = convert_to_base_unit(abs(pr['quantity']), unit)
+                cost = abs(pr['quantity']) * pr['rate']  # qty * rate, no transport
+                key = (cat, item_type)
+                _rate_num[key] = _rate_num.get(key, 0.0) + cost
+                _rate_den[key] = _rate_den.get(key, 0.0) + qty_base
+        avg_rates = {
+            k: _rate_num[k] / _rate_den[k]
+            for k in _rate_num if _rate_den.get(k, 0) > 0
+        }
 
         sales_in_period = f_hist[f_hist['transaction_type'] == 'sale']
-        total_sales = sales_in_period['amount'].sum()
+        # Revenue = qty * rate only (exclude transport surcharges billed to client)
+        total_sales = (sales_in_period['quantity'].abs() * sales_in_period['rate']).sum()
         total_operating_exp = f_exp['amount'].sum()
 
         cogs = 0.0
@@ -627,6 +647,37 @@ elif page == "New Transaction":
             with st.container(border=True):
                 if st.session_state.editing_index == i:
                     st.markdown(f"**✏️ Editing Item {i+1}**")
+
+                    # ── Bill Header fields ────────────────────────────────────
+                    st.caption("👤 Bill Header")
+                    h1, h2, h3, h4 = st.columns(4)
+                    with h1:
+                        _parties = sorted(history_df['party_name'].unique().tolist()) if not history_df.empty else []
+                        _cur_party = item.get('party_name', '')
+                        _party_opts = ["-- New Party --"] + _parties
+                        _party_idx = _party_opts.index(_cur_party) if _cur_party in _party_opts else 0
+                        _sel_party = st.selectbox("Party Name", _party_opts, index=_party_idx, key=f"ehp_{i}")
+                        new_party = st.text_input("Enter New Party", key=f"ehpn_{i}").lower() if _sel_party == "-- New Party --" else _sel_party
+                    with h2:
+                        _sites = sorted(history_df['site_name'].dropna().unique().tolist()) if not history_df.empty else []
+                        _cur_site = item.get('site_name', '')
+                        _site_opts = ["-- New Site --"] + _sites
+                        _site_idx = _site_opts.index(_cur_site) if _cur_site in _site_opts else 0
+                        _sel_site = st.selectbox("Site", _site_opts, index=_site_idx, key=f"ehs_{i}")
+                        new_site = st.text_input("Enter New Site", key=f"ehsn_{i}").lower() if _sel_site == "-- New Site --" else _sel_site
+                    with h3:
+                        _cur_veh = item.get('vehicle_name', '')
+                        _veh_opts = ["-- No Vehicle --"] + VEHICLES
+                        _veh_idx = _veh_opts.index(_cur_veh) if _cur_veh in _veh_opts else 0
+                        _sel_veh = st.selectbox("Vehicle", _veh_opts, index=_veh_idx, key=f"ehv_{i}")
+                        new_vehicle = "" if _sel_veh == "-- No Vehicle --" else _sel_veh
+                    with h4:
+                        new_mobile = st.text_input("Mobile", value=item.get('mobile_number', ''), max_chars=10, key=f"ehm_{i}")
+
+                    st.divider()
+
+                    # ── Item fields ───────────────────────────────────────────
+                    st.caption("📦 Item Details")
                     e1, e2, e3 = st.columns(3)
                     with e1:
                         new_qty = st.number_input("Quantity", value=abs(item['quantity']), min_value=0.0, step=1.0, key=f"eq_{i}")
@@ -651,7 +702,11 @@ elif page == "New Transaction":
                             "amount": new_qty * new_rate + st.session_state.cart[i].get('transport_cost', 0),
                             "transaction_type": new_type,
                             "cash_credit": new_pay,
-                            "remarks": new_remarks
+                            "remarks": new_remarks,
+                            "party_name": new_party,
+                            "site_name": new_site,
+                            "vehicle_name": new_vehicle,
+                            "mobile_number": new_mobile,
                         })
                         st.session_state.editing_index = None
                         st.rerun()
@@ -848,39 +903,426 @@ elif page == "View History":
 
     HIDE_COLS = ["created_at", "is_deleted", "date_dt"]
 
+    # ── Flat option lists for SelectboxColumn (derived from INVENTORY_RULES) ──
+    ALL_CATEGORIES = list(INVENTORY_RULES.keys())
+    ALL_ITEMS = sorted({itm for cat_items in INVENTORY_RULES.values() for itm in cat_items})
+    ALL_UNITS = sorted({u for cat_items in INVENTORY_RULES.values()
+                        for item_units in cat_items.values() for u in item_units})
+
+    # Editor key resets on filter change OR after a successful save
+    _ekey = f"{time_filter}_{selected_party}_{search}_{st.session_state.inline_save_counter}"
+
+    # ── Shared column config for both Sales and Purchases editors ─────────────
+    TXN_COL_CONFIG = {
+        "id":               st.column_config.NumberColumn("ID",           disabled=True),
+        "date":             st.column_config.TextColumn("Date",           disabled=True),
+        "mobile_number":    st.column_config.TextColumn("Mobile",         disabled=True),
+        "amount":           st.column_config.NumberColumn("Amount (₹)",   disabled=True, format="₹%.2f"),
+        "category":         st.column_config.SelectboxColumn("Category",      options=ALL_CATEGORIES, required=True),
+        "item_type":        st.column_config.SelectboxColumn("Item Type",     options=ALL_ITEMS,      required=True),
+        "unit":             st.column_config.SelectboxColumn("Unit",          options=ALL_UNITS,      required=True),
+        "transaction_type": st.column_config.SelectboxColumn("Type",          options=["sale", "purchase"], required=True),
+        "quantity":         st.column_config.NumberColumn("Quantity",    min_value=0.0, step=1.0),
+        "rate":             st.column_config.NumberColumn("Rate (₹)",    min_value=0.0, step=1.0, format="₹%.2f"),
+        "party_name":       st.column_config.TextColumn("Party Name"),
+        "site_name":        st.column_config.TextColumn("Site"),
+        "vehicle_name":     st.column_config.TextColumn("Vehicle"),
+        "cash_credit":      st.column_config.SelectboxColumn("Payment",       options=["cash", "credit"], required=True),
+        "remarks":          st.column_config.TextColumn("Remarks"),
+    }
+
+    # ── Helper: validate + save changed rows from inline editor ───────────────
+    def _save_inline_edits(edited_df, original_df):
+        """Returns (saved_count, error_list). Modifies stock + Supabase in place."""
+        errors = []
+        saved = 0
+
+        orig_indexed  = original_df.set_index('id')
+        edited_indexed = edited_df.set_index('id')
+
+        CHECK_COLS = ['quantity', 'rate', 'category', 'item_type', 'unit',
+                      'transaction_type', 'party_name', 'site_name',
+                      'vehicle_name', 'cash_credit', 'remarks']
+
+        for row_id, erow in edited_indexed.iterrows():
+            if row_id not in orig_indexed.index:
+                continue
+            orow = orig_indexed.loc[row_id]
+
+            # Detect if anything actually changed
+            changed = any(
+                str(erow.get(c, '')) != str(orow.get(c, ''))
+                for c in CHECK_COLS if c in erow.index
+            )
+            if not changed:
+                continue
+
+            # ── Validate ──────────────────────────────────────────────────────
+            try:
+                new_qty  = abs(float(erow['quantity']))
+                new_rate = float(erow['rate'])
+            except (ValueError, TypeError):
+                errors.append(f"ID {row_id}: Quantity and Rate must be numbers.")
+                continue
+
+            new_cat    = str(erow['category'])
+            new_item   = str(erow['item_type'])
+            new_unit   = str(erow['unit'])
+            new_txn    = str(erow['transaction_type'])
+            new_party  = str(erow.get('party_name', '')).strip()
+            new_site   = str(erow.get('site_name',  ''))
+            new_veh    = str(erow.get('vehicle_name', ''))
+            new_cc     = str(erow.get('cash_credit', 'cash'))
+            new_rem    = str(erow.get('remarks', ''))
+
+            if new_qty <= 0:
+                errors.append(f"ID {row_id}: Quantity must be > 0.")
+                continue
+            if new_rate < 0:
+                errors.append(f"ID {row_id}: Rate cannot be negative.")
+                continue
+            if not new_party:
+                errors.append(f"ID {row_id}: Party name cannot be empty.")
+                continue
+            if new_cat not in INVENTORY_RULES:
+                errors.append(f"ID {row_id}: '{new_cat}' is not a valid category.")
+                continue
+            if new_item not in INVENTORY_RULES[new_cat]:
+                errors.append(f"ID {row_id}: '{new_item}' is not valid for category '{new_cat}'.")
+                continue
+            if new_unit not in INVENTORY_RULES[new_cat][new_item]:
+                errors.append(f"ID {row_id}: '{new_unit}' is not a valid unit for '{new_item}'.")
+                continue
+            if new_txn not in ('sale', 'purchase'):
+                errors.append(f"ID {row_id}: Transaction type must be 'sale' or 'purchase'.")
+                continue
+            if new_cc not in ('cash', 'credit'):
+                errors.append(f"ID {row_id}: Payment mode must be 'cash' or 'credit'.")
+                continue
+
+            # ── Fetch authoritative original row from DB ───────────────────────
+            db_resp = supabase.table("transactions").select(
+                "quantity, category, item_type, unit"
+            ).eq("id", int(row_id)).execute()
+            if not db_resp.data:
+                errors.append(f"ID {row_id}: Record not found in database.")
+                continue
+            db_orig = db_resp.data[0]
+            old_qty_signed = float(db_orig['quantity'])
+            old_cat  = db_orig['category']
+            old_item = db_orig['item_type']
+            old_unit = db_orig['unit']
+
+            # ── Stock reconciliation ───────────────────────────────────────────
+            new_signed_qty = -abs(new_qty) if new_txn == 'sale' else abs(new_qty)
+            # 1. Reverse the old contribution
+            update_stock(old_cat, old_item, old_unit, -old_qty_signed)
+            # 2. Apply the new contribution
+            update_stock(new_cat, new_item, new_unit, new_signed_qty)
+
+            # ── Persist ───────────────────────────────────────────────────────
+            new_amount = round(abs(new_qty) * new_rate, 2)
+            supabase.table("transactions").update({
+                "quantity":         new_signed_qty,
+                "rate":             new_rate,
+                "amount":           new_amount,
+                "category":         new_cat,
+                "item_type":        new_item,
+                "unit":             new_unit,
+                "transaction_type": new_txn,
+                "party_name":       new_party,
+                "site_name":        new_site,
+                "vehicle_name":     new_veh,
+                "cash_credit":      new_cc,
+                "remarks":          new_rem,
+            }).eq("id", int(row_id)).execute()
+            saved += 1
+
+        return saved, errors
+
+    # ── Helper: validate + save changed payment rows ──────────────────────────
+    def _save_payment_edits(edited_df, original_df, cmp_cols):
+        """Returns (saved_count, error_list). Updates the payments table in Supabase."""
+        errors, saved = [], 0
+        orig_idx   = original_df.set_index('id')
+        edited_idx = edited_df.set_index('id')
+
+        for pid, erow in edited_idx.iterrows():
+            if pid not in orig_idx.index:
+                continue
+            orow = orig_idx.loc[pid]
+            changed = any(str(erow.get(c, '')) != str(orow.get(c, '')) for c in cmp_cols)
+            if not changed:
+                continue
+            # Validate
+            new_party = str(erow.get('party_name', '')).strip()
+            new_ptype = str(erow.get('payment_type', ''))
+            try:
+                new_amt = float(erow['amount'])
+            except (ValueError, TypeError):
+                errors.append(f"ID {pid}: Amount must be a number.")
+                continue
+            if not new_party:
+                errors.append(f"ID {pid}: Party name cannot be empty.")
+                continue
+            if new_ptype not in ('Inward', 'Outward'):
+                errors.append(f"ID {pid}: Direction must be 'Inward' or 'Outward'.")
+                continue
+            if new_amt <= 0:
+                errors.append(f"ID {pid}: Amount must be > 0.")
+                continue
+            supabase.table("payments").update({
+                "party_name":   new_party,
+                "payment_type": new_ptype,
+                "amount":       round(new_amt, 2),
+                "remarks":      str(erow.get('remarks', '')),
+            }).eq("id", int(pid)).execute()
+            saved += 1
+
+        return saved, errors
+
+    # ── Helper: prepare a df for the editor (drop hidden cols, correct qty sign) ─
+    def _prep_editor_df(df, abs_qty=True):
+        out = df.drop(columns=[c for c in HIDE_COLS if c in df.columns]).copy()
+        if abs_qty:
+            out['quantity'] = out['quantity'].abs()
+        # Ensure consistent column order
+        ordered = ['id', 'date', 'category', 'item_type', 'unit', 'quantity', 'rate',
+                   'amount', 'transaction_type', 'party_name', 'site_name',
+                   'vehicle_name', 'cash_credit', 'remarks', 'mobile_number']
+        out = out[[c for c in ordered if c in out.columns]]
+        return out
+
+    # ═══════════════════════════════════  SALES  ═══════════════════════════════
     with tab_sale:
-        sales_df = filtered_history[filtered_history['transaction_type'] == 'sale'].copy()
-        if not sales_df.empty:
-            sales_df['quantity'] = sales_df['quantity'].abs()
-            st.dataframe(sales_df.drop(columns=[c for c in HIDE_COLS if c in sales_df.columns]), width='stretch', hide_index=True)
+        sales_raw = filtered_history[filtered_history['transaction_type'] == 'sale'].copy()
+        if not sales_raw.empty:
+            orig_sales = _prep_editor_df(sales_raw, abs_qty=True)
+
+            st.caption("✏️ Click any cell to edit. Press **💾 Save changes** when done.")
+            edited_sales = st.data_editor(
+                orig_sales,
+                key=f"sales_ed_{_ekey}",
+                use_container_width=True,
+                hide_index=True,
+                column_config=TXN_COL_CONFIG,
+                num_rows="fixed",
+            )
+
+            # Live-update the Amount preview column so user sees impact immediately
+            edited_sales = edited_sales.copy()
+            edited_sales['amount'] = (edited_sales['quantity'].abs() * edited_sales['rate']).round(2)
+
+            # Detect if any row was actually modified
+            cmp_cols = [c for c in ['quantity','rate','category','item_type','unit',
+                                    'transaction_type','party_name','site_name',
+                                    'vehicle_name','cash_credit','remarks']
+                        if c in edited_sales.columns]
+            n_changed = (edited_sales[cmp_cols].astype(str) != orig_sales[cmp_cols].astype(str)).any(axis=1).sum()
+
+            if n_changed > 0:
+                st.info(f"📝 {n_changed} row(s) modified — review then save.")
+                if st.button(f"💾 Save {n_changed} change(s)", type="primary", key="save_sales_btn"):
+                    saved, errs = _save_inline_edits(edited_sales, orig_sales)
+                    for e in errs:
+                        st.error(e)
+                    if saved > 0:
+                        st.success(f"✅ {saved} row(s) saved successfully!")
+                        st.session_state.inline_save_counter += 1
+                        st.rerun()
         else:
             st.info("No sales found.")
 
+    # ══════════════════════════════════  PURCHASES  ════════════════════════════
     with tab_purchase:
-        purchase_df = filtered_history[filtered_history['transaction_type'] == 'purchase']
-        st.dataframe(purchase_df.drop(columns=[c for c in HIDE_COLS if c in purchase_df.columns]), width='stretch', hide_index=True)
+        purch_raw = filtered_history[filtered_history['transaction_type'] == 'purchase'].copy()
+        if not purch_raw.empty:
+            orig_purch = _prep_editor_df(purch_raw, abs_qty=False)
 
+            st.caption("✏️ Click any cell to edit. Press **💾 Save changes** when done.")
+            edited_purch = st.data_editor(
+                orig_purch,
+                key=f"purch_ed_{_ekey}",
+                use_container_width=True,
+                hide_index=True,
+                column_config=TXN_COL_CONFIG,
+                num_rows="fixed",
+            )
+
+            edited_purch = edited_purch.copy()
+            edited_purch['amount'] = (edited_purch['quantity'].abs() * edited_purch['rate']).round(2)
+
+            cmp_cols = [c for c in ['quantity','rate','category','item_type','unit',
+                                    'transaction_type','party_name','site_name',
+                                    'vehicle_name','cash_credit','remarks']
+                        if c in edited_purch.columns]
+            n_changed_p = (edited_purch[cmp_cols].astype(str) != orig_purch[cmp_cols].astype(str)).any(axis=1).sum()
+
+            if n_changed_p > 0:
+                st.info(f"📝 {n_changed_p} row(s) modified — review then save.")
+                if st.button(f"💾 Save {n_changed_p} change(s)", type="primary", key="save_purch_btn"):
+                    saved_p, errs_p = _save_inline_edits(edited_purch, orig_purch)
+                    for e in errs_p:
+                        st.error(e)
+                    if saved_p > 0:
+                        st.success(f"✅ {saved_p} row(s) saved successfully!")
+                        st.session_state.inline_save_counter += 1
+                        st.rerun()
+        else:
+            st.info("No purchases found.")
+
+    # ═══════════════════════════════════  EXPENSES  ════════════════════════════
     with tab_exp:
-        st.dataframe(expense_df.drop(columns=[c for c in HIDE_COLS if c in expense_df.columns]), width='stretch', hide_index=True)
+        if not expense_df.empty:
+            orig_exp = expense_df.drop(columns=[c for c in HIDE_COLS + ['date_dt'] if c in expense_df.columns]).copy()
+            # Consistent column order
+            _exp_cols = ['id', 'date', 'expense_type', 'amount', 'remarks']
+            orig_exp = orig_exp[[c for c in _exp_cols if c in orig_exp.columns]]
 
+            EXP_COL_CONFIG = {
+                "id":           st.column_config.NumberColumn("ID",           disabled=True),
+                "date":         st.column_config.TextColumn("Date",           disabled=True),
+                "expense_type": st.column_config.SelectboxColumn("Expense Type", options=EXPENSE_TYPES, required=True),
+                "amount":       st.column_config.NumberColumn("Amount (₹)",   min_value=0.0, step=10.0, format="₹%.2f"),
+                "remarks":      st.column_config.TextColumn("Remarks"),
+            }
+
+            st.caption("✏️ Click any cell to edit. Press **💾 Save changes** when done.")
+            edited_exp = st.data_editor(
+                orig_exp,
+                key=f"exp_ed_{_ekey}",
+                use_container_width=True,
+                hide_index=True,
+                column_config=EXP_COL_CONFIG,
+                num_rows="fixed",
+            )
+
+            _exp_cmp = ['expense_type', 'amount', 'remarks']
+            n_exp_changed = (
+                edited_exp[_exp_cmp].astype(str) != orig_exp[_exp_cmp].astype(str)
+            ).any(axis=1).sum()
+
+            if n_exp_changed > 0:
+                st.info(f"📝 {n_exp_changed} row(s) modified — review then save.")
+                if st.button(f"💾 Save {n_exp_changed} change(s)", type="primary", key="save_exp_btn"):
+                    saved_e, errs_e = 0, []
+                    orig_exp_idx = orig_exp.set_index('id')
+                    edited_exp_idx = edited_exp.set_index('id')
+
+                    for eid, erow in edited_exp_idx.iterrows():
+                        orow = orig_exp_idx.loc[eid]
+                        changed = any(str(erow.get(c,'')) != str(orow.get(c,'')) for c in _exp_cmp)
+                        if not changed:
+                            continue
+                        # Validate
+                        if str(erow['expense_type']) not in EXPENSE_TYPES:
+                            errs_e.append(f"ID {eid}: Invalid expense type.")
+                            continue
+                        try:
+                            new_amt = float(erow['amount'])
+                        except (ValueError, TypeError):
+                            errs_e.append(f"ID {eid}: Amount must be a number.")
+                            continue
+                        if new_amt <= 0:
+                            errs_e.append(f"ID {eid}: Amount must be > 0.")
+                            continue
+                        supabase.table("expenses").update({
+                            "expense_type": str(erow['expense_type']),
+                            "amount":       round(new_amt, 2),
+                            "remarks":      str(erow.get('remarks', '')),
+                        }).eq("id", int(eid)).execute()
+                        saved_e += 1
+
+                    for e in errs_e:
+                        st.error(e)
+                    if saved_e > 0:
+                        st.success(f"✅ {saved_e} expense(s) saved!")
+                        st.session_state.inline_save_counter += 1
+                        st.rerun()
+        else:
+            st.info("No expenses recorded yet.")
+
+    # ═══════════════════════════════════  PAYMENTS  ════════════════════════════
     with tab_pay:
         if not payments_df.empty:
-            inward_df = payments_df[payments_df['payment_type'] == 'Inward'].drop(columns=[c for c in HIDE_COLS if c in payments_df.columns])
-            outward_df = payments_df[payments_df['payment_type'] == 'Outward'].drop(columns=[c for c in HIDE_COLS if c in payments_df.columns])
+            _all_pay_parties = sorted(payments_df['party_name'].dropna().unique().tolist())
+            # Merge parties from transactions too for a richer dropdown
+            if not history_df.empty:
+                _all_pay_parties = sorted(set(_all_pay_parties) | set(history_df['party_name'].dropna().unique().tolist()))
 
+            PAY_COL_CONFIG = {
+                "id":           st.column_config.NumberColumn("ID",           disabled=True),
+                "date":         st.column_config.TextColumn("Date",           disabled=True),
+                "party_name":   st.column_config.SelectboxColumn("Party",     options=_all_pay_parties, required=True),
+                "payment_type": st.column_config.SelectboxColumn("Direction", options=["Inward", "Outward"], required=True),
+                "amount":       st.column_config.NumberColumn("Amount (₹)",   min_value=0.0, step=10.0, format="₹%.2f"),
+                "remarks":      st.column_config.TextColumn("Remarks"),
+            }
+
+            orig_pay = payments_df.drop(columns=[c for c in HIDE_COLS + ['date_dt'] if c in payments_df.columns]).copy()
+            _pay_cols = ['id', 'date', 'party_name', 'payment_type', 'amount', 'remarks']
+            orig_pay = orig_pay[[c for c in _pay_cols if c in orig_pay.columns]]
+
+            # ── Inward summary ────────────────────────────────────────────────
             st.markdown("### 🟢 Inward Payments (Received from Clients)")
-            if not inward_df.empty:
-                st.dataframe(inward_df, width='stretch', hide_index=True)
-                st.caption(f"Total Received: ₹{inward_df['amount'].sum():,.2f}")
+            inward_orig = orig_pay[orig_pay['payment_type'] == 'Inward'].copy()
+            if not inward_orig.empty:
+                st.caption("✏️ Click any cell to edit. Press **💾 Save changes** when done.")
+                edited_inward = st.data_editor(
+                    inward_orig,
+                    key=f"pay_in_ed_{_ekey}",
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=PAY_COL_CONFIG,
+                    num_rows="fixed",
+                )
+                st.caption(f"Total Received: ₹{inward_orig['amount'].sum():,.2f}")
+
+                _pay_cmp = ['party_name', 'payment_type', 'amount', 'remarks']
+                n_in_changed = (
+                    edited_inward[_pay_cmp].astype(str) != inward_orig[_pay_cmp].astype(str)
+                ).any(axis=1).sum()
+                if n_in_changed > 0:
+                    st.info(f"📝 {n_in_changed} row(s) modified.")
+                    if st.button(f"💾 Save {n_in_changed} inward change(s)", type="primary", key="save_inward_btn"):
+                        saved_i, errs_i = _save_payment_edits(edited_inward, inward_orig, _pay_cmp)
+                        for e in errs_i: st.error(e)
+                        if saved_i > 0:
+                            st.success(f"✅ {saved_i} payment(s) saved!")
+                            st.session_state.inline_save_counter += 1
+                            st.rerun()
             else:
                 st.info("No inward payments recorded yet.")
 
             st.divider()
 
+            # ── Outward summary ───────────────────────────────────────────────
             st.markdown("### 🔴 Outward Payments (Paid to Suppliers)")
-            if not outward_df.empty:
-                st.dataframe(outward_df, width='stretch', hide_index=True)
-                st.caption(f"Total Paid: ₹{outward_df['amount'].sum():,.2f}")
+            outward_orig = orig_pay[orig_pay['payment_type'] == 'Outward'].copy()
+            if not outward_orig.empty:
+                st.caption("✏️ Click any cell to edit. Press **💾 Save changes** when done.")
+                edited_outward = st.data_editor(
+                    outward_orig,
+                    key=f"pay_out_ed_{_ekey}",
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config=PAY_COL_CONFIG,
+                    num_rows="fixed",
+                )
+                st.caption(f"Total Paid: ₹{outward_orig['amount'].sum():,.2f}")
+
+                n_out_changed = (
+                    edited_outward[_pay_cmp].astype(str) != outward_orig[_pay_cmp].astype(str)
+                ).any(axis=1).sum()
+                if n_out_changed > 0:
+                    st.info(f"📝 {n_out_changed} row(s) modified.")
+                    if st.button(f"💾 Save {n_out_changed} outward change(s)", type="primary", key="save_outward_btn"):
+                        saved_o, errs_o = _save_payment_edits(edited_outward, outward_orig, _pay_cmp)
+                        for e in errs_o: st.error(e)
+                        if saved_o > 0:
+                            st.success(f"✅ {saved_o} payment(s) saved!")
+                            st.session_state.inline_save_counter += 1
+                            st.rerun()
             else:
                 st.info("No outward payments recorded yet.")
         else:
