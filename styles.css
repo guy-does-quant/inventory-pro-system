@@ -8,11 +8,10 @@
    ===================================================== */
 
 /* ─── GOOGLE FONTS + MATERIAL ICONS ─────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons+Round');
 
 /* ─── FIX: Material Icons sidebar button ────────────── */
-/* This fixes the raw "keyboard_double_arrow_left" text */
 [data-testid="collapsedControl"] span,
 button[data-testid="baseButton-headerNoPadding"] span,
 .material-icons-round,
@@ -88,8 +87,8 @@ section[data-testid="stSidebar"] > div {
     --expense-color:   var(--rose-bright);
     --pending-color:   var(--amber-bright);
 
-    /* Font */
-    --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Font — Plus Jakarta Sans for crisp readability at larger sizes */
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 
     /* Radius */
@@ -104,6 +103,7 @@ html, body, .stApp {
     background-color: var(--bg-base) !important;
     color: var(--text-primary) !important;
     font-family: var(--font-main) !important;
+    font-size: 16px !important;          /* ↑ was implicit ~14px */
 }
 
 * {
@@ -126,7 +126,7 @@ section[data-testid="stSidebar"] * {
 
 /* Sidebar title "Go to" */
 section[data-testid="stSidebar"] .stRadio label:first-of-type {
-    font-size: 10px !important;
+    font-size: 12px !important;          /* ↑ was 10px */
     text-transform: uppercase !important;
     letter-spacing: 0.12em !important;
     color: var(--text-muted) !important;
@@ -134,8 +134,8 @@ section[data-testid="stSidebar"] .stRadio label:first-of-type {
 
 /* Sidebar nav radio items */
 section[data-testid="stSidebar"] .stRadio [data-testid="stMarkdownContainer"] p {
-    font-size: 13px !important;
-    font-weight: 500 !important;
+    font-size: 15px !important;          /* ↑ was 13px */
+    font-weight: 600 !important;
     letter-spacing: 0.02em !important;
     color: var(--text-secondary) !important;
     transition: color 0.15s ease !important;
@@ -146,7 +146,7 @@ section[data-testid="stSidebar"] .stRadio [aria-checked="true"] [data-testid="st
     color: var(--emerald-bright) !important;
 }
 
-/* Radio button dot — hide default, style the outer circle */
+/* Radio button dot */
 section[data-testid="stSidebar"] .stRadio input[type="radio"] {
     accent-color: var(--emerald-bright) !important;
 }
@@ -159,31 +159,31 @@ section[data-testid="stSidebar"] .stAlert {
 }
 section[data-testid="stSidebar"] .stAlert p {
     color: var(--amber-bright) !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
+    font-size: 14px !important;          /* ↑ was 12px */
+    font-weight: 600 !important;
 }
 
 /* ─── PAGE TITLES ────────────────────────────────────── */
 h1 {
     color: var(--text-primary) !important;
-    font-size: 26px !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.02em !important;
-    padding-bottom: 12px !important;
+    font-size: 32px !important;          /* ↑ was 26px */
+    font-weight: 800 !important;
+    letter-spacing: -0.03em !important;
+    padding-bottom: 14px !important;
     border-bottom: 1px solid var(--bg-border) !important;
-    margin-bottom: 24px !important;
+    margin-bottom: 28px !important;
 }
 
 h2 {
     color: var(--text-primary) !important;
-    font-size: 18px !important;
-    font-weight: 600 !important;
+    font-size: 22px !important;          /* ↑ was 18px */
+    font-weight: 700 !important;
 }
 
 h3 {
     color: var(--text-secondary) !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
+    font-size: 17px !important;          /* ↑ was 15px */
+    font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.06em !important;
 }
@@ -192,8 +192,8 @@ h3 {
 /* Label above the number */
 [data-testid="stMetric"] label {
     color: var(--text-secondary) !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
+    font-size: 13px !important;          /* ↑ was 11px */
+    font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
 }
@@ -201,15 +201,15 @@ h3 {
 /* The big number */
 [data-testid="stMetricValue"] {
     color: var(--text-primary) !important;
-    font-size: 28px !important;
-    font-weight: 700 !important;
+    font-size: 32px !important;          /* ↑ was 28px */
+    font-weight: 800 !important;
     font-variant-numeric: tabular-nums !important;
     letter-spacing: -0.02em !important;
 }
 
 /* Delta value */
 [data-testid="stMetricDelta"] {
-    font-size: 12px !important;
+    font-size: 14px !important;          /* ↑ was 12px */
 }
 
 /* Container around each metric */
@@ -217,7 +217,7 @@ h3 {
     background: var(--bg-surface) !important;
     border: 1px solid var(--bg-border) !important;
     border-radius: var(--radius-lg) !important;
-    padding: 18px 20px !important;
+    padding: 20px 22px !important;
     transition: border-color 0.2s ease !important;
 }
 
@@ -233,10 +233,10 @@ button[data-testid="baseButton-primary"] {
     color: #ffffff !important;
     border: none !important;
     border-radius: var(--radius-md) !important;
-    font-weight: 600 !important;
-    font-size: 13px !important;
-    letter-spacing: 0.02em !important;
-    padding: 10px 20px !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;          /* ↑ was 13px */
+    letter-spacing: 0.01em !important;
+    padding: 11px 22px !important;
     transition: all 0.15s ease !important;
     box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
 }
@@ -255,8 +255,8 @@ button[data-testid="baseButton-secondary"] {
     color: var(--text-secondary) !important;
     border: 1px solid var(--bg-border) !important;
     border-radius: var(--radius-md) !important;
-    font-weight: 500 !important;
-    font-size: 13px !important;
+    font-weight: 600 !important;
+    font-size: 15px !important;          /* ↑ was 13px */
     transition: all 0.15s ease !important;
 }
 
@@ -268,7 +268,6 @@ button[data-testid="baseButton-secondary"]:hover {
 }
 
 /* ─── INPUTS & SELECTS ───────────────────────────────── */
-/* All input types */
 .stTextInput input,
 .stNumberInput input,
 .stDateInput input,
@@ -279,7 +278,7 @@ button[data-testid="baseButton-secondary"]:hover {
     color: var(--text-primary) !important;
     border: 1px solid var(--bg-border) !important;
     border-radius: var(--radius-md) !important;
-    font-size: 13px !important;
+    font-size: 16px !important;          /* ↑ was 13px */
     transition: border-color 0.15s ease !important;
 }
 
@@ -298,8 +297,8 @@ button[data-testid="baseButton-secondary"]:hover {
 .stMultiSelect label,
 label[data-testid="stWidgetLabel"] {
     color: var(--text-secondary) !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
+    font-size: 13px !important;          /* ↑ was 12px */
+    font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.06em !important;
     margin-bottom: 4px !important;
@@ -308,6 +307,7 @@ label[data-testid="stWidgetLabel"] {
 /* Placeholder text */
 input::placeholder {
     color: var(--text-muted) !important;
+    font-size: 15px !important;
 }
 
 /* Selectbox dropdown */
@@ -321,7 +321,7 @@ input::placeholder {
 [data-baseweb="option"] {
     background-color: var(--bg-elevated) !important;
     color: var(--text-primary) !important;
-    font-size: 13px !important;
+    font-size: 15px !important;          /* ↑ was 13px */
 }
 
 [data-baseweb="option"]:hover,
@@ -332,7 +332,7 @@ input::placeholder {
 
 /* ─── RADIO BUTTONS ──────────────────────────────────── */
 .stRadio [data-testid="stMarkdownContainer"] p {
-    font-size: 13px !important;
+    font-size: 15px !important;          /* ↑ was 13px */
     color: var(--text-secondary) !important;
 }
 
@@ -369,9 +369,9 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 
 [data-testid="stTabs"] button[role="tab"] {
     color: var(--text-secondary) !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    padding: 10px 18px !important;
+    font-size: 15px !important;          /* ↑ was 13px */
+    font-weight: 600 !important;
+    padding: 12px 20px !important;
     border-radius: 0 !important;
     border-bottom: 2px solid transparent !important;
     transition: all 0.15s ease !important;
@@ -386,7 +386,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 [data-testid="stTabs"] button[aria-selected="true"] {
     color: var(--emerald-bright) !important;
     border-bottom-color: var(--emerald-bright) !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
 }
 
 /* ─── DATAFRAMES / TABLES ────────────────────────────── */
@@ -401,21 +401,21 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 .stDataFrame thead th {
     background-color: var(--bg-elevated) !important;
     color: var(--text-secondary) !important;
-    font-size: 11px !important;
+    font-size: 13px !important;          /* ↑ was 11px */
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
     border-bottom: 1px solid var(--bg-border) !important;
-    padding: 10px 14px !important;
+    padding: 12px 16px !important;
 }
 
 [data-testid="stDataFrame"] tbody td,
 .stDataFrame tbody td {
     background-color: var(--bg-surface) !important;
     color: var(--text-primary) !important;
-    font-size: 13px !important;
+    font-size: 15px !important;          /* ↑ was 13px */
     border-bottom: 1px solid var(--bg-border) !important;
-    padding: 10px 14px !important;
+    padding: 12px 16px !important;
     font-variant-numeric: tabular-nums !important;
 }
 
@@ -424,6 +424,12 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
 }
 
 /* ─── ALERTS / INFO BOXES ────────────────────────────── */
+[data-testid="stAlertContainer"] p,
+[data-testid="stAlertContainer"] * {
+    font-size: 15px !important;          /* ↑ was default ~13px */
+    font-weight: 500 !important;
+}
+
 /* st.success */
 [data-testid="stAlertContainer"][data-baseweb="notification"][kind="positive"] {
     background-color: var(--emerald-glow) !important;
@@ -468,6 +474,7 @@ hr {
     border: 1px solid var(--emerald-border) !important;
     border-radius: var(--radius-md) !important;
     color: var(--text-primary) !important;
+    font-size: 15px !important;
 }
 
 /* ─── DOWNLOAD BUTTON ────────────────────────────────── */
@@ -476,8 +483,8 @@ hr {
     color: #ffffff !important;
     border: none !important;
     border-radius: var(--radius-md) !important;
-    font-weight: 600 !important;
-    font-size: 13px !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;          /* ↑ was 13px */
     transition: all 0.15s ease !important;
 }
 
@@ -492,14 +499,20 @@ hr {
 small,
 [data-testid="stCaptionContainer"] {
     color: var(--text-muted) !important;
-    font-size: 11px !important;
+    font-size: 13px !important;          /* ↑ was 11px */
 }
 
 /* ─── MARKDOWN TEXT ──────────────────────────────────── */
 [data-testid="stMarkdownContainer"] p {
     color: var(--text-secondary) !important;
-    font-size: 14px !important;
-    line-height: 1.6 !important;
+    font-size: 16px !important;          /* ↑ was 14px */
+    line-height: 1.65 !important;
+}
+
+/* Bold text inside markdown */
+[data-testid="stMarkdownContainer"] p strong {
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
 }
 
 /* Headings inside markdown */
@@ -530,8 +543,6 @@ small,
 }
 
 /* ─── CUSTOM SALE/PURCHASE COLOUR CARDS (inline HTML) ── */
-/* These override the inline styles used in New Transaction */
-/* Sale container */
 div[style*="background-color:#f0fff4"] {
     background-color: var(--emerald-glow) !important;
     border-color: var(--emerald-bright) !important;
@@ -539,7 +550,6 @@ div[style*="background-color:#f0fff4"] {
     border-radius: var(--radius-md) !important;
 }
 
-/* Purchase container */
 div[style*="background-color:#fff5f5"] {
     background-color: var(--rose-glow) !important;
     border-color: var(--rose-bright) !important;
@@ -592,7 +602,7 @@ input[type="number"]::-webkit-outer-spin-button {
     border: 1px solid var(--bg-border) !important;
     border-radius: var(--radius-sm) !important;
     color: var(--text-primary) !important;
-    font-size: 12px !important;
+    font-size: 14px !important;          /* ↑ was 12px */
 }
 
 /* ─── WHATSAPP SHARE BUTTON OVERRIDE ─────────────────── */
@@ -647,6 +657,6 @@ a[href*="whatsapp"]:hover {
 /* Restore ONLY the label */
 [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] p {
     color: var(--text-secondary) !important;
-    font-size: 13px !important;
+    font-size: 15px !important;          /* ↑ was 13px */
     font-weight: 600 !important;
 }
