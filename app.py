@@ -251,7 +251,8 @@ INVENTORY_RULES = {
         "Grey Cement 10 Kg": {"kg"}
     },
     "Sanla": {
-        "Sanla": {"bag"}
+        "Morchap": {"bag"},
+        "Golden Morchap": {"bag"}
     }
 }
 
